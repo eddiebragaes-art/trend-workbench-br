@@ -1,4 +1,4 @@
-// Modificado para trend-workbench-br: mercado brasileiro (B3) via Yahoo Finance.
+// Modificado para trend-workbench-br: mercado brasileiro (B3) e índices/commodities (futuros) via Yahoo Finance.
 import type { Candle, Instrument, Interval, Market, MarketData } from './market-types';
 import { getCryptoCandles, searchCrypto, CryptoDataError } from './crypto-sources.ts';
 export { resetMarketNetworkFailures } from './crypto-sources.ts';
@@ -7,6 +7,7 @@ import { chooseEquityHistory } from './equity-history.ts';
 import { withHistoryCoverage } from './history-coverage.ts';
 import { aggregateB3FourHour } from './equity-four-hour.ts';
 import { B3_OPEN_MINUTE, B3_ZONE, b3CloseMinute, b3YahooSymbol } from './b3-session.ts';
+import { FUTURES, FUT_ZONE, aggregateFuturesFourHour, futuresBarClosed, futuresClock, futuresContract, futuresOpen, futuresSymbol } from './futures-session.ts';
 
 /** Public market-data adapters. No credentials, no trading and no synthetic prices. */
 export class MarketError extends Error {
@@ -20,6 +21,7 @@ export const AVAILABLE_INTERVALS: Record<Market, Interval[]> = {
   us: ALL_INTERVALS,
   cn: ALL_INTERVALS,
   br: ALL_INTERVALS,
+  fut: ALL_INTERVALS,
 };
 const MINUTES: Record<Exclude<Interval, '1M'>, number> = { '1m': 1, '5m': 5, '15m': 15, '30m': 30, '1h': 60, '4h': 240, '1d': 1440, '1w': 10080 };
 const isCalendarBar = (interval: Interval) => ['1d', '1w', '1M'].includes(interval);
@@ -64,6 +66,7 @@ const popularRows: Record<Market, [string, string, string, string][]> = {
   us: [['AAPL','苹果 Apple','NASDAQ','USD'],['MSFT','微软 Microsoft','NASDAQ','USD'],['NVDA','英伟达 NVIDIA','NASDAQ','USD'],['TSLA','特斯拉 Tesla','NASDAQ','USD'],['AMZN','亚马逊 Amazon','NASDAQ','USD'],['GOOGL','谷歌 Alphabet','NASDAQ','USD'],['META','Meta Platforms','NASDAQ','USD'],['AMD','AMD','NASDAQ','USD'],['COIN','Coinbase','NASDAQ','USD'],['MSTR','Strategy','NASDAQ','USD'],['SPY','标普500 ETF','NYSE Arca','USD'],['QQQ','纳斯达克100 ETF','NASDAQ','USD']],
   cn: [['600519.SH','贵州茅台 guizhoumaotai gzmt','上交所','CNY'],['300750.SZ','宁德时代 ningdeshidai ndsd','深交所','CNY'],['002594.SZ','比亚迪 biyadi byd','深交所','CNY'],['000001.SZ','平安银行 pinganyinhang payh','深交所','CNY'],['600036.SH','招商银行 zhaoshangyinhang zsyh','上交所','CNY'],['601318.SH','中国平安 zhongguopingan zgpa','上交所','CNY'],['600900.SH','长江电力 changjiangdianli cjdl','上交所','CNY'],['000858.SZ','五粮液 wuliangye wly','深交所','CNY'],['000333.SZ','美的集团 meidijituan mdjt','深交所','CNY'],['688981.SH','中芯国际 zhongxinguoji zxgj','上交所','CNY'],['300059.SZ','东方财富 dongfangcaifu dfcf','深交所','CNY'],['920599.BJ','同力股份 tongligufen tlgf','北交所','CNY']],
   br: [['PETR4','Petrobras PN','B3','BRL'],['VALE3','Vale ON','B3','BRL'],['ITUB4','Itaú Unibanco PN','B3','BRL'],['BBDC4','Bradesco PN','B3','BRL'],['BBAS3','Banco do Brasil ON','B3','BRL'],['ABEV3','Ambev ON','B3','BRL'],['WEGE3','WEG ON','B3','BRL'],['B3SA3','B3 ON','B3','BRL'],['ITSA4','Itaúsa PN','B3','BRL'],['PRIO3','PRIO ON','B3','BRL'],['BOVA11','iShares Ibovespa ETF','B3','BRL'],['^BVSP','Ibovespa','B3','BRL']],
+  fut: FUTURES.map(f => [f.symbol, f.name, f.exchange, f.currency] as [string, string, string, string]),
 };
 function popular(market: Market, q: string): Instrument[] {
   const key = q.toLowerCase().replace(/[\s/]/g, '');
@@ -76,13 +79,13 @@ function unique(rows: Instrument[]): Instrument[] {
 }
 export type SearchMarket = Market | 'all';
 interface SearchResult { results: Instrument[]; warning?: string }
-const SEARCH_MARKETS: Market[] = ['crypto', 'us', 'cn', 'br'];
-const MARKET_NAMES: Record<Market, string> = { crypto: '加密货币', us: '美股', cn: 'A股', br: '巴西B3' };
+const SEARCH_MARKETS: Market[] = ['crypto', 'us', 'cn', 'br', 'fut'];
+const MARKET_NAMES: Record<Market, string> = { crypto: '加密货币', us: '美股', cn: 'A股', br: '巴西B3', fut: '指数与商品' };
 export function parseSearchMarket(value: string | null): SearchMarket {
   return !value || value === 'all' ? 'all' : parseMarket(value);
 }
 export function parseMarket(value: string | null): Market {
-  if (value === 'crypto' || value === 'us' || value === 'cn' || value === 'br') return value;
+  if (value === 'crypto' || value === 'us' || value === 'cn' || value === 'br' || value === 'fut') return value;
   throw new MarketError('请选择 crypto、us 或 cn 市场。', 400);
 }
 export function parseInterval(value: string | null, market: Market): Interval {
@@ -95,6 +98,11 @@ export function normalizeSymbol(market: Market, input: string): string {
   if (market === 'crypto') {
     const symbol = value.replace(/\//g, '');
     if (!/^[A-Z0-9]{4,30}$/.test(symbol)) throw new MarketError('请输入有效的现货交易对，例如 BTCUSDT。', 400);
+    return symbol;
+  }
+  if (market === 'fut') {
+    const symbol = futuresSymbol(value);
+    if (!symbol) throw new MarketError('Choose an index or commodity: NAS100, US30, US500, XAUUSD, XAGUSD, USOIL or UKOIL.', 400);
     return symbol;
   }
   if (market === 'br') {
@@ -238,6 +246,10 @@ async function searchSingleMarket(market: Market, query: string): Promise<Search
       if (market === 'crypto') {
         return {results:await searchCrypto(q)};
       }
+      if (market === 'fut') {
+        const alias = futuresSymbol(q);
+        return { results: unique([...(alias ? popular('fut', alias) : []), ...local]) };
+      }
       if (market === 'us') {
         const key = local[0]?.symbol && /[^\x00-\x7F]/.test(q) ? local[0].symbol : q;
         try {
@@ -286,6 +298,7 @@ export async function getCandles(market: Market, rawSymbol: string, interval: In
   return cached(`candles:${market}:${symbol}:${interval}:${limit}`, 30000, async () => {
     const data = market === 'crypto' ? await cryptoCandles(symbol,interval,limit)
       : market === 'br' ? await brCandles(symbol,interval,limit)
+      : market === 'fut' ? await futCandles(symbol,interval,limit)
       : interval === '4h' ? await equityFourHourCandles(market,symbol,limit)
       : market === 'us' ? await usCandles(symbol,interval,limit)
       : await cnCandles(symbol,interval,limit);
@@ -532,6 +545,75 @@ async function brCandles(symbol: string, interval: Interval, limit: number): Pro
     if (error instanceof MarketError && [403,429].includes(error.upstreamStatus || 0)) yahooUnavailableUntil = Date.now() + 5*60000;
     throw error;
   }
+}
+/** Index and commodity futures from Yahoo Finance (continuous front month).
+ * Prices follow the futures contract, so they can differ from a broker's CFD
+ * or spot quote by the contract basis. No independent fallback is used. */
+async function futCandles(symbol: string, interval: Interval, limit: number): Promise<MarketData> {
+  if (yahooUnavailableUntil > Date.now()) throw new MarketError('Yahoo Finance is rate limiting requests; index and commodity data is temporarily unavailable. Please retry in a few minutes.',503);
+  try {
+    if (interval !== '4h') return await yahooFutures(symbol,interval,limit);
+    const hourly = await yahooFutures(symbol,'1h',Math.min(8200, limit * 5 + 16));
+    const result = aggregateFuturesFourHour(hourly.candles);
+    const candles = ensure(result.candles,1).slice(-limit);
+    const warnings = ['4-hour candles follow the Globex session: 18:00, 22:00, 02:00, 06:00, 10:00 and 14:00–17:00 New York time; incomplete historical buckets are skipped.'];
+    if (candles.length < 200) warnings.push(`4小时有效K线仅${candles.length}根，受来源分钟历史窗口限制，统计样本可能不足。`);
+    return { ...hourly, interval: '4h', candles, source: `${hourly.source} · 1小时聚合4小时`, warnings: [...hourly.warnings.filter(w => !/有效K线/.test(w)), ...warnings], availableIntervals: AVAILABLE_INTERVALS.fut };
+  } catch (error) {
+    if (error instanceof MarketError && [403,429].includes(error.upstreamStatus || 0)) yahooUnavailableUntil = Date.now() + 5*60000;
+    throw error;
+  }
+}
+async function yahooFutures(symbol: string, interval: Interval, limit: number): Promise<MarketData> {
+  const contract = futuresContract(symbol);
+  if (!contract) throw new MarketError('This index or commodity is not supported.',404);
+  const providerInterval = interval === '1h' ? '60m' : interval === '1w' ? '1wk' : interval === '1M' ? '1mo' : interval;
+  const range = interval === '1m' ? '7d' : interval === '1d' ? '5y' : interval === '1h' ? '2y' : '60d';
+  const window = interval === '1w' || interval === '1M'
+    ? `period1=${Date.UTC(2000,0,1)/1000}&period2=${Math.floor(Date.now()/1000)+86400}` : `range=${range}`;
+  const query = `interval=${providerInterval}&${window}&includePrePost=false`;
+  let data: YahooChart, host = 'query1.finance.yahoo.com';
+  try { data = await json<YahooChart>(`https://${host}/v8/finance/chart/${encodeURIComponent(contract.yahoo)}?${query}`); }
+  catch(error) {
+    if (error instanceof MarketError && error.status === 404) throw new MarketError('This contract was not found on the data source.',404);
+    if (error instanceof MarketError && [403,429].includes(error.upstreamStatus || 0)) throw error;
+    host = 'query2.finance.yahoo.com';
+    data = await json<YahooChart>(`https://${host}/v8/finance/chart/${encodeURIComponent(contract.yahoo)}?${query}`);
+  }
+  const result = data?.chart?.result?.[0];
+  if (!result || data.chart?.error) throw new MarketError('This contract was not found, or this interval has no data.',404);
+  const meta = result.meta || {};
+  if (meta.exchangeTimezoneName && meta.exchangeTimezoneName !== FUT_ZONE) throw new MarketError('The data source returned an unexpected exchange time zone for this contract.',422);
+  validateYahooGranularity(interval,meta.dataGranularity);
+  const q = result.indicators?.quote?.[0];
+  if (!q || !Array.isArray(result.timestamp) || ![q.open,q.high,q.low,q.close,q.volume].every(Array.isArray)) throw new MarketError('行情源缺少完整K线。');
+  const now = Date.now()/1000;
+  const rows: Candle[] = result.timestamp.map((time: number,i: number) => ({time,open:q.open[i] == null ? NaN : Number(q.open[i]),high:q.high[i] == null ? NaN : Number(q.high[i]),low:q.low[i] == null ? NaN : Number(q.low[i]),close:q.close[i] == null ? NaN : Number(q.close[i]),volume:q.volume[i] == null ? 0 : Number(q.volume[i]),closed:futuresBarClosed(time,interval,now)}));
+  // Intraday rows must start on the interval grid inside the Globex session;
+  // Yahoo can append an instantaneous last quote that is not an OHLC bar.
+  const sessionRows = isCalendarBar(interval) ? rows : rows.filter(c => Number.isFinite(c.time) && c.time % (MINUTES[interval as Exclude<Interval,'1M'>]*60) === 0 && futuresOpen(c.time));
+  const prepared = interval === '1M' ? futuresMonthly(rows,meta.dataGranularity) : interval === '1w' ? normalizeYahooWeeklyCandles(rows,meta.dataGranularity,FUT_ZONE) : sessionRows;
+  const candles = ensure(prepared,1).slice(-limit);
+  const warnings = ['Continuous front-month futures from Yahoo Finance. Prices can differ from a broker CFD or spot quote (contract basis and roll dates).','Globex session: Sunday 18:00 to Friday 17:00 New York time, with a daily pause from 17:00 to 18:00. Holidays are not modelled; quotes are delayed about 10 minutes.'];
+  if (candles.length < 200) warnings.push(`该周期仅有${candles.length}根有效K线，统计样本可能不足。`);
+  return {instrument:instrument('fut',symbol,contract.name,contract.exchange,contract.currency),interval,candles,
+    source:`Yahoo Finance public feed · futures ${contract.yahoo} · ${host}`,asOf:new Date(now*1000).toISOString(),
+    delayNotice:'Delayed about 10 minutes; not a direct exchange feed · Globex session (New York time) · Candles are start-stamped',
+    adjustment:'Raw OHLC from the source (unadjusted); continuous-contract rolls can create price gaps',
+    warnings,availableIntervals:AVAILABLE_INTERVALS.fut};
+}
+/** Yahoo may stamp a futures month either at local midnight or at the prior
+ * 18:00 session start; both resolve to the first trading date of the month. */
+function futuresMonthly(rows:Candle[],granularity:string|undefined):Candle[] {
+  if(granularity!=='1mo')throw new MarketError('Yahoo返回周期与月线不一致，未将季度数据作为月线使用。');
+  const months=new Map<string,Candle>();
+  for(const row of sanitizeCandles(rows)) {
+    const local=localClock(row.time,FUT_ZONE).date, trading=futuresClock(row.time).date;
+    const date=local.endsWith('-01')?local:trading.endsWith('-01')?trading:null;
+    if(!date)continue;
+    if(!months.has(date.slice(0,7)))months.set(date.slice(0,7),row);
+  }
+  return [...months.values()];
 }
 function brYahooResult(symbol:string,interval:Interval,candles:Candle[],trimmed:boolean,meta:{longName?:string;shortName?:string},host:string,now:number,adjusted:boolean):MarketData {
   const warnings = ['B3 regular session only (10:00 to 17:00 or 18:00 São Paulo time, following the US clock change); auction and after-market trades are excluded. Recent candles are confirmed after a 15-minute delay.','Exchange holidays are not modelled; public Yahoo data may be delayed or rate limited.'];

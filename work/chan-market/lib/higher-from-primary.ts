@@ -67,7 +67,7 @@ function crypto(primary:MarketData, target:Interval, asOf:number):Aggregation|nu
  * unknown timestamp conventions are not guessed or filled with synthetic rows. */
 function equities(primary:MarketData, target:Interval, asOf:number):Aggregation|null {
   const market=primary.instrument.market;
-  if(market==='crypto')return null;
+  if(market==='crypto'||market==='fut')return null;
   const source=primary.source;
   const endLabelled=market==='cn' && /^(?:东方财富|腾讯证券|新浪财经)/.test(source)
     || market==='us' && /^东方财富/.test(source);

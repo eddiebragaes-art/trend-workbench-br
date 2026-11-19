@@ -1,3 +1,4 @@
+// Modificado para trend-workbench-br: aceita os mercados B3 e índices/commodities.
 import {FORECAST_MODEL_VERSION,FORECAST_PARAMETER_VERSION} from './forecast.ts';
 import type {Interval,Market} from './market-types';
 
@@ -24,7 +25,7 @@ function comparison(value:unknown):value is ValidationComparison {
 }
 function row(value:unknown):value is ValidationReportRow {
   return object(value)&&typeof value.name==='string'&&value.name.length>0&&value.name.length<=160
-    &&['crypto','us','cn'].includes(String(value.market))&&['1m','5m','15m','30m','1h','4h','1d','1w','1M'].includes(String(value.interval))
+    &&['crypto','us','cn','br','fut'].includes(String(value.market))&&['1m','5m','15m','30m','1h','4h','1d','1w','1M'].includes(String(value.interval))
     &&count(value.closedBars)&&count(value.folds)&&comparison(value.baseline)&&comparison(value.shadow)
     &&(value.modelVersions===undefined||versionMatches(value.modelVersions,FORECAST_MODEL_VERSION))
     &&(value.parameterVersions===undefined||versionMatches(value.parameterVersions,FORECAST_PARAMETER_VERSION));

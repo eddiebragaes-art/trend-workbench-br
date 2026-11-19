@@ -1,5 +1,6 @@
-// Modificado para trend-workbench-br: mercado brasileiro (B3).
+// Modificado para trend-workbench-br: mercado brasileiro (B3) e índices/commodities (fut).
 import { B3_OPEN_MINUTE, b3CloseMinute } from './b3-session.ts';
+import { FUT_CLOSE_MINUTE, FUT_DELAY_SECONDS } from './futures-session.ts';
 import type { Interval, MarketData } from './market-types';
 import { exchangeClock } from './timeframe-context.ts';
 
@@ -35,7 +36,7 @@ export function getFeedHealth(data:MarketData|null,options:FeedHealthOptions):Fe
   const bars=data?.candles.filter(c=>Number.isFinite(c.time)&&Number.isFinite(c.close)&&c.close>0)||[];
   const last=bars.at(-1),lastBarTimeMs=last?last.time*1000:null;
   const market=data?.instrument.market,interval=options.interval||data?.interval||'1h';
-  const expectedDelayMs=market==='crypto'?0:market==='cn'?120000:market==='us'?900000:null;
+  const expectedDelayMs=market==='crypto'?0:market==='cn'?120000:market==='us'||market==='br'?900000:market==='fut'?FUT_DELAY_SECONDS*1000:null;
   const base={checkedAtMs:nowMs,lastSuccessAtMs,fetchedAtMs,quoteTimeMs:null,lastBarTimeMs,ageMs:lastBarTimeMs==null?null:Math.max(0,nowMs-lastBarTimeMs),expectedDelayMs};
   const result=(state:FeedHealthState,label:string,labelEn:string,detail:string,detailEn:string):FeedHealth=>({...base,state,allowSignals:state==='fresh'||state==='delayed',label,labelEn,detail,detailEn});
   if(options.error)return result('error','行情连接异常','Feed error',`最近一次获取失败：${options.error}；暂停新信号。`,'The latest fetch failed. New signals are paused until a successful, current response arrives.');
@@ -54,7 +55,7 @@ export function getFeedHealth(data:MarketData|null,options:FeedHealthOptions):Fe
   if(market!=='crypto') {
     const clock=exchangeClock(nowMs/1000,market);minute=clock.minute;
     const day=new Date(`${clock.date}T00:00:00Z`).getUTCDay();
-    const open=day!==0&&day!==6&&(market==='cn'?(minute>=570&&minute<690||minute>=780&&minute<900):market==='br'?minute>=B3_OPEN_MINUTE&&minute<b3CloseMinute(nowMs/1000):minute>=570&&minute<960);
+    const open=day!==0&&day!==6&&(market==='cn'?(minute>=570&&minute<690||minute>=780&&minute<900):market==='br'?minute>=B3_OPEN_MINUTE&&minute<b3CloseMinute(nowMs/1000):market==='fut'?minute<FUT_CLOSE_MINUTE:minute>=570&&minute<960);
     if(!open)return result('closed',market==='cn'&&day!==0&&day!==6&&minute>=690&&minute<780?'午间休市':'常规交易时段外','Outside regular trading hours',
       `按交易所当地时间处于周末、盘前盘后或午休；最近K线日期 ${lastDate}。保留历史，不把休市当停更，不发新入场提醒。节假日另需核对。`,
       `Outside regular exchange-local hours (weekend, pre/post-market or lunch). Latest bar date: ${lastDate}. History is retained; closed-market gaps do not trigger feed-stale alerts or new entries. Holidays are not verified.`);
@@ -72,7 +73,7 @@ export function getFeedHealth(data:MarketData|null,options:FeedHealthOptions):Fe
   const normalLag=intervalMs+60000,delayedLag=normalLag+(expectedDelayMs||0);
   const age=nowMs-lastBarTimeMs!;
   if(market!=='crypto'&&lastDate!==nowDate) {
-    if(minute<(market==='br'?B3_OPEN_MINUTE:570)+delayedLag/60000)return {...result('delayed','开盘数据衔接中','Opening-session delay',
+    if(minute<(market==='br'?B3_OPEN_MINUTE:market==='fut'?0:570)+delayedLag/60000)return {...result('delayed','开盘数据衔接中','Opening-session delay',
       '仍是上一交易日K线，处于开盘容忍窗口；等待当前交易日数据前不应追报旧信号。',
       'The feed still contains the prior session during the opening grace window. Do not replay old signals while waiting for current-session bars.'),allowSignals:false};
     return result('unknown','交易日时效待核实','Trading date unverified','最近K线不属于今日；未接交易所节假日历，无法区分节假日、停牌与旧行情，暂停新信号。','The latest bar is from an earlier date. Without an exchange holiday calendar, a holiday, halt or old feed cannot be distinguished; new signals are paused.');

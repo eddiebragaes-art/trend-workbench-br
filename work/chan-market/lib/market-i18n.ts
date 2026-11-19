@@ -126,6 +126,7 @@ const phrases: [string,string][] = [
   ['暂不可用','is unavailable'],
   ['加密货币','Cryptocurrency'],
   ['巴西B3','B3 Brazil'],
+  ['指数与商品','Indices & commodities'],
   ['美股','US equities'],
   ['A股','China A-shares'],
   ['上交所','Shanghai Stock Exchange'],

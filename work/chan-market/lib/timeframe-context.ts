@@ -1,8 +1,9 @@
 // Modificado para trend-workbench-br: mercado brasileiro (B3).
 import type { Candle, Interval, Market, MarketData } from './market-types';
 import { B3_ZONE, b3CloseMinute } from './b3-session.ts';
+import { FUT_CLOSE_MINUTE, FUT_DELAY_SECONDS, futuresClock } from './futures-session.ts';
 
-type StockMarket='cn'|'us'|'br';
+type StockMarket='cn'|'us'|'br'|'fut';
 
 const seconds: Record<Exclude<Interval, '1M'>, number> = {
   '1m':60, '5m':300, '15m':900, '30m':1800, '1h':3600, '4h':14400, '1d':86400, '1w':604800,
@@ -13,6 +14,8 @@ const clocks = {
   br:new Intl.DateTimeFormat('en-CA',{timeZone:B3_ZONE,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}),
 };
 export function exchangeClock(time:number,market:StockMarket) {
+  // Futures use the Globex trading clock: minute 0 is 18:00 New York of the previous evening.
+  if(market==='fut'){const c=futuresClock(time);return {date:c.date,minute:c.minute};}
   const p=Object.fromEntries(clocks[market].formatToParts(new Date(time*1000)).map(v=>[v.type,v.value]));
   return {date:`${p.year}-${p.month}-${p.day}`,minute:Number(p.hour)*60+Number(p.minute)};
 }
@@ -49,9 +52,9 @@ export function candleAvailableAt(candle:Pick<Candle,'time'>,market:Market,inter
     const d=new Date(candle.time*1000);
     return Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+1,1)/1000;
   }
-  const c=exchangeClock(candle.time,market),delay=market==='cn'?120:900;
+  const c=exchangeClock(candle.time,market),delay=market==='cn'?120:market==='fut'?FUT_DELAY_SECONDS:900;
   // Session close in exchange minutes: A-shares 15:00, US 16:00, B3 17:00 or 18:00.
-  const close=market==='cn'?900:market==='br'?b3CloseMinute(candle.time):960;
+  const close=market==='cn'?900:market==='br'?b3CloseMinute(candle.time):market==='fut'?FUT_CLOSE_MINUTE:960;
   const day=new Date(`${c.date}T00:00:00Z`);
   if(interval==='1M') {
     day.setUTCMonth(day.getUTCMonth()+1,1);
@@ -62,6 +65,7 @@ export function candleAvailableAt(candle:Pick<Candle,'time'>,market:Market,inter
     return localEpoch(day.toISOString().slice(0,10),close,market)+delay;
   }
   if(interval==='1d')return localEpoch(c.date,close,market)+delay;
+  if(interval==='4h'&&market==='fut')return localEpoch(c.date,Math.min(Math.floor(c.minute/240)*240+240,close),market)+delay;
   if(interval==='4h')return localEpoch(c.date,market==='cn'?900:market==='br'?(c.minute<840?840:close):c.minute<810?810:960,market)+delay;
   if(market==='cn'||/东方财富|Eastmoney|周期结束/i.test(source))return candle.time+delay;
   return Math.min(candle.time+seconds[interval],localEpoch(c.date,close,market))+delay;

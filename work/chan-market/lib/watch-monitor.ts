@@ -1,3 +1,4 @@
+// Modificado para trend-workbench-br: aceita os mercados B3 e índices/commodities.
 import type { Analysis, Instrument, Interval, MarketData } from './market-types';
 import { readMarketResponse } from './market-response.ts';
 import type { MarketForecast } from './forecast-types';
@@ -25,7 +26,7 @@ export interface WatchMonitorOptions {
 export function selectWatchInstruments(watchlist:Instrument[]):Instrument[] {
   const seen=new Set<string>();
   return watchlist.filter(i=>{
-    if(!i||!['crypto','us','cn'].includes(i.market)||typeof i.symbol!=='string'||!i.symbol)return false;
+    if(!i||!['crypto','us','cn','br','fut'].includes(i.market)||typeof i.symbol!=='string'||!i.symbol)return false;
     const key=`${i.market}:${i.symbol}`;
     if(seen.has(key))return false;
     seen.add(key);return true;
