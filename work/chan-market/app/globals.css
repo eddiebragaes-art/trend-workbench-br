@@ -1,3 +1,4 @@
+/* Modificado para trend-workbench-br: crédito ao projeto original. */
 @import "tailwindcss";
 :root{--background:#0b1118;--foreground:#d9e3e8;--card:#101923;--border:#24313c;--muted:#182530;--muted-foreground:#7c909f;--primary:#54d5ac;--ring:#54d5ac;--green:#54d5ac;--red:#ee8383;--gold:#c8ad79;--mono:ui-monospace,SFMono-Regular,Consolas,monospace;color-scheme:dark}
 @theme inline{--color-background:var(--background);--color-foreground:var(--foreground);--color-card:var(--card);--color-border:var(--border);--color-primary:var(--primary);--color-muted:var(--muted);--color-muted-foreground:var(--muted-foreground);--color-ring:var(--ring);--font-sans:"Microsoft YaHei UI","Microsoft YaHei","PingFang SC","Segoe UI",sans-serif}
@@ -394,3 +395,21 @@ html[lang=en] .topbar .brand b { font-size: 18px; letter-spacing: 0; }
   .topbar .language-switch button { padding: 5px 6px; }
   .official-links a { padding-inline: 5px; gap: 5px; }
 }
+
+/* Adicionado em trend-workbench-br: crédito ao projeto original na barra lateral. */
+.original-credit{display:block;margin-top:10px;font-size:11px;color:inherit;opacity:.7;text-decoration:underline}
+.original-credit:hover{opacity:1}
+
+/* Adicionado em trend-workbench-br: conta virtual. */
+.paper-status{font-size:13px;padding:3px 9px;border-radius:4px;border:1px solid #3d5663;color:#c6d8df}.paper-status.passed{border-color:#3f8a6c;color:#8fe3bf;background:#16302a}.paper-status.failed{border-color:#8a4a52;color:#ffc3c9;background:#312128}
+.paper-metrics small{color:#8ea6b1;font-size:12px;margin-left:4px}.paper-account .neg{color:#ee8b92}.paper-account .pos{color:#7fd8b2}
+.paper-progress{height:6px;border-radius:3px;background:#1d2d36;margin:4px 0 12px;overflow:hidden}.paper-progress i{display:block;height:100%;background:#5fc49c}
+.paper-trade{font-size:13px;line-height:1.8;color:#c4d6dd;padding:8px 0;border-top:1px solid #1d2d36}.paper-trade small{color:#8ea6b1;margin-left:6px}
+.paper-rules{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px 18px;font-size:13px;color:#c4d6dd;margin:8px 0}.paper-rules label{display:flex;flex-direction:column;gap:5px}.paper-rules input[type=number],.paper-rules select{border:1px solid #49606d;border-radius:4px;background:#0e1920;color:#e0ecef;padding:7px 9px;font-size:13px}.paper-rules .paper-check{flex-direction:row;align-items:center}
+
+/* Adicionado em trend-workbench-br: laboratório de mesa. */
+.prop-lab .neg{color:#ee8b92}.prop-lab .pos{color:#7fd8b2}
+.lab-recommendation{display:flex;flex-direction:column;gap:6px;padding:14px 16px;margin:12px 0;border-left:3px solid #68dcb5;background:#162d28;color:#cae8dd;font-size:14px;line-height:1.7}.lab-recommendation small{color:#ffd9a8}
+.lab-table{width:100%;border-collapse:collapse;margin:10px 0;font-size:13px;color:#c4d6dd}.lab-table th,.lab-table td{padding:8px 9px;border-bottom:1px solid #1d2d36;text-align:left;vertical-align:top}.lab-table th{color:#8ea6b1;font-weight:500}.lab-table tbody tr{cursor:pointer}.lab-table tr.selected{background:#16262e}.lab-table td small{display:block;color:#8ea6b1;font-size:12px}.lab-table td.best{outline:2px solid #68dcb5;outline-offset:-2px;background:#16302a}
+@media(max-width:700px){.lab-table{font-size:12px}.lab-table th,.lab-table td{padding:6px 5px}}
+.lab-variants{margin:14px 0;overflow-x:auto}.lab-variants .card-top label{font-size:13px;color:#8ea6b1}.lab-variants .card-top select{margin-left:6px}.lab-table tr.baseline td{color:#ffd9a8}

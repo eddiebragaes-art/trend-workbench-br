@@ -1,3 +1,4 @@
+// Modificado para trend-workbench-br: mercado brasileiro (B3) e índices/commodities (fut).
 import type { Candle, MarketData } from './market-types.ts';
 import type { MarketForecast, ReadyForecastSide } from './forecast-types.ts';
 import { candleAvailableAt, exchangeClock } from './timeframe-context.ts';
@@ -22,8 +23,8 @@ export function forecastIdentity(data:Pick<MarketData,'instrument'|'interval'|'s
   return [data.instrument.market,data.instrument.symbol,data.interval,data.source,data.adjustment].join('|');
 }
 const validBar=(b:Candle)=>[b.time,b.open,b.high,b.low,b.close].every(Number.isFinite)&&b.time>0&&b.low>0&&b.high>=Math.max(b.open,b.close)&&b.low<=Math.min(b.open,b.close);
-function localStart(date:string,market:'cn'|'us'):number {
-  const wall=Date.parse(`${date}T00:00:00Z`)/1000+570*60;
+function localStart(date:string,market:'cn'|'us'|'br'|'fut'):number {
+  const wall=Date.parse(`${date}T00:00:00Z`)/1000+(market==='br'?600:market==='fut'?0:570)*60;
   let guess=wall;
   for(let i=0;i<3;i++){const c=exchangeClock(guess,market);guess+=wall-(Date.parse(`${c.date}T00:00:00Z`)/1000+c.minute*60);}
   return guess;
@@ -176,7 +177,7 @@ const number=(v:unknown):v is number=>typeof v==='number'&&Number.isFinite(v);
 function validRecord(v:unknown):v is ForecastRecord {
   if(!object(v)||!object(v.outlook)||!Array.isArray(v.outlook.targets)||v.outlook.targets.length!==2||!Array.isArray(v.events))return false;
   if(v.audit!==undefined&&!validForecastAudit(v.audit))return false;
-  if(!['id','key','symbol','source','adjustment'].every(k=>typeof v[k]==='string')||!['crypto','cn','us'].includes(String(v.market))||!['1m','5m','15m','30m','1h','4h','1d','1w','1M'].includes(String(v.interval)))return false;
+  if(!['id','key','symbol','source','adjustment'].every(k=>typeof v[k]==='string')||!['crypto','cn','us','br','fut'].includes(String(v.market))||!['1m','5m','15m','30m','1h','4h','1d','1w','1M'].includes(String(v.interval)))return false;
   if(v.key!==[v.market,v.symbol,v.interval,v.source,v.adjustment].join('|'))return false;
   if(!['watching','condition-met','target2','invalidated','expired','missed','ambiguous','data-gap'].includes(String(v.status))||!['createdAt','referencePrice','referenceTime','lastBarTime','lastClose','barsObserved'].every(k=>number(v[k])&&(v[k] as number)>=0))return false;
   const p=v.outlook;if(!Array.isArray(p.targets)||p.status!=='ready'||!['long','short'].includes(String(p.side))||!['zoneLow','zoneHigh','triggerPrice','invalidationPrice'].every(k=>number(p[k])&&(p[k] as number)>0)||!p.targets.every(t=>object(t)&&number(t.price)&&t.price>0))return false;

@@ -1,6 +1,9 @@
+// Modificado para trend-workbench-br: mercado brasileiro (B3) e índices/commodities (fut).
 import type { Candle, Interval, Market } from './market-types';
 import type { AnalysisInput, Confluence, ConfluenceContext, ConfluenceDirection, ConfluenceEvidence, ConfluenceSide, HigherConfluence, MacdConfluence, VolumeConfluence } from './confluence-types';
 import { candleAvailableAt, eligibleHigherCandles, exchangeClock, higherInterval } from './timeframe-context.ts';
+import { B3_OPEN_MINUTE, b3CloseMinute } from './b3-session.ts';
+import { FUT_CLOSE_MINUTE } from './futures-session.ts';
 
 type MacdPoint = { time: number; dif: number; dea: number; hist: number };
 const intraday = (interval: Interval) => !['1d', '1w', '1M'].includes(interval);
@@ -72,15 +75,15 @@ function adjustmentKind(value: string): string | null {
 
 // Missing exchange holidays can conservatively withhold an old observation;
 // they must never make a future completed candle available in a replay.
-function elapsedTradingMinutes(from: number, to: number, market: 'cn' | 'us'): number {
+function elapsedTradingMinutes(from: number, to: number, market: 'cn' | 'us' | 'br' | 'fut'): number {
   const start = exchangeClock(from, market), end = exchangeClock(to, market);
   const a = Date.parse(`${start.date}T00:00:00Z`), b = Date.parse(`${end.date}T00:00:00Z`);
   if (b < a || b - a > 370 * 86400000) return Infinity;
-  const sessions = market === 'cn' ? [[570,690],[780,900]] : [[570,960]];
   let total = 0;
   for (let d = a; d <= b; d += 86400000) {
     const weekday = new Date(d).getUTCDay();
     if (weekday === 0 || weekday === 6) continue;
+    const sessions = market === 'cn' ? [[570,690],[780,900]] : market === 'br' ? [[B3_OPEN_MINUTE,b3CloseMinute(d/1000+15*3600)]] : market === 'fut' ? [[0,FUT_CLOSE_MINUTE]] : [[570,960]];
     const low = d === a ? start.minute : 0, high = d === b ? end.minute : 1440;
     for (const [open,close] of sessions) total += Math.max(0, Math.min(high,close) - Math.max(low,open));
   }

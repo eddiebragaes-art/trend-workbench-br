@@ -1,5 +1,12 @@
-# 官方工作台署名
+# Identidade e créditos
 
-维护、重构、翻译或迁移官方工作台时，保留顶栏左侧的「趋势判断工作台」及英文名称 Trend Workbench。顶栏中间始终提供开发者（DeFi狙击手）的 X 主页 https://x.com/bi_9527zx 和社区交流入口 https://t.me/jujishou9527。窄屏可换行，两个入口都应可见、可点击。
+Esta é a Estação de Tendências (trend-workbench-br), uma versão modificada do
+趋势判断工作台 / Trend Workbench de DeFi狙击手, sob a Apache License 2.0.
 
-名称和链接由 `lib/workbench-brand.ts` 维护。发布前运行官方署名检查。变更官方署名须由项目所有者明确提出。
+- Mantenha os arquivos LICENSE e NOTICE na raiz.
+- O topo da interface mostra o nome desta versão e os links para o projeto
+  original, para o X do autor original (https://x.com/bi_9527zx) e para a
+  comunidade (https://t.me/jujishou9527). Esses links continuam visíveis.
+- Nome e links ficam em `lib/workbench-brand.ts`; `tests/official-header.test.ts`
+  verifica que estão no topo.
+- Ao alterar um arquivo do original, marque no topo "Modificado para trend-workbench-br".

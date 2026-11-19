@@ -1,4 +1,5 @@
-﻿param(
+﻿# Modificado para trend-workbench-br: mensagens em português.
+param(
     [switch]$NoWindow,
     [switch]$CheckOnly
 )
@@ -97,14 +98,14 @@ function Write-LauncherLog([string]$message) {
 
 try {
     foreach ($requiredPath in @($nodePath, $serverPath, $entryPath)) {
-        if (!(Test-Path -LiteralPath $requiredPath -PathType Leaf)) { throw ('程序文件缺失：' + $requiredPath + [Environment]::NewLine + '请保留完整的“趋势判断工作台”文件夹。') }
+        if (!(Test-Path -LiteralPath $requiredPath -PathType Leaf)) { throw ('Arquivo do programa ausente: ' + $requiredPath + [Environment]::NewLine + 'Mantenha a pasta da Estação de Tendências completa.') }
     }
     $edgeCandidates = @()
     if (${env:ProgramFiles(x86)}) { $edgeCandidates += Join-Path ${env:ProgramFiles(x86)} 'Microsoft\Edge\Application\msedge.exe' }
     if ($env:ProgramFiles) { $edgeCandidates += Join-Path $env:ProgramFiles 'Microsoft\Edge\Application\msedge.exe' }
     if ($env:LOCALAPPDATA) { $edgeCandidates += Join-Path $env:LOCALAPPDATA 'Microsoft\Edge\Application\msedge.exe' }
     $edgePath = $edgeCandidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
-    if (!$NoWindow -and !$edgePath) { throw '没有找到 Microsoft Edge，无法打开独立窗口。请先安装或修复 Windows 自带的 Edge。' }
+    if (!$NoWindow -and !$edgePath) { throw 'Microsoft Edge não encontrado; não é possível abrir a janela. Instale ou repare o Edge do Windows.' }
     if ($CheckOnly) {
         [pscustomobject]@{ AppDirectory=$appDirectory; Runtime=$nodePath; Server=$serverPath; Browser=$edgePath; URL=$appUrl }
         exit 0
@@ -113,10 +114,10 @@ try {
     $launchMutex = New-Object Threading.Mutex($false, 'Local\TrendWorkbenchLocal43127')
     try { $ownsMutex = $launchMutex.WaitOne(45000) }
     catch [Threading.AbandonedMutexException] { $ownsMutex = $true }
-    if (!$ownsMutex) { throw '工作台正在启动，等待时间过长。请稍后再次打开。' }
+    if (!$ownsMutex) { throw 'A estação já está iniciando e demorou demais. Tente abrir de novo em instantes.' }
     $health = Get-LocalHealth
     if (!(Test-WorkbenchHealth $health)) {
-        if ($null -ne $health -or (Test-LocalPortInUse)) { throw '本机端口 43127 已被其他程序占用。工作台没有停止或修改该程序；请先关闭占用端口的程序再重试。' }
+        if ($null -ne $health -or (Test-LocalPortInUse)) { throw 'A porta local 43127 está em uso por outro programa. Feche esse programa e tente de novo.' }
         [void][IO.Directory]::CreateDirectory($logDirectory)
         $serverArguments = '"' + $serverPath + '" --port ' + $serverPort
         $startedProcess = Start-Process -FilePath $nodePath -ArgumentList $serverArguments -WorkingDirectory $appDirectory -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $logDirectory 'server.stdout.log') -RedirectStandardError (Join-Path $logDirectory 'server.stderr.log')
@@ -124,13 +125,13 @@ try {
         $deadline = [DateTime]::UtcNow.AddSeconds(40)
         $ready = $false
         do {
-            if ($startedProcess.HasExited) { throw ('本机服务已退出，退出码：' + $startedProcess.ExitCode + '。请查看 logs\server.stderr.log。') }
+            if ($startedProcess.HasExited) { throw ('O serviço local fechou com o código ' + $startedProcess.ExitCode + '. Veja logs\server.stderr.log.') }
             $health = Get-LocalHealth
             if (Test-WorkbenchHealth $health) { $ready = $true; break }
-            if ($null -ne $health) { throw '端口返回的服务身份不匹配，未打开该页面。' }
+            if ($null -ne $health) { throw 'O serviço nesta porta não é a Estação de Tendências; a página não foi aberta.' }
             Start-Sleep -Milliseconds 250
         } while ([DateTime]::UtcNow -lt $deadline)
-        if (!$ready) { throw '本机服务启动超过40秒。请查看 logs 文件夹内的日志后重试。' }
+        if (!$ready) { throw 'O serviço local levou mais de 40 segundos para iniciar. Veja os registros na pasta logs e tente de novo.' }
     }
     Write-LauncherLog ('Local server ready PID ' + $health.pid)
     if ($NoWindow) {
@@ -148,13 +149,13 @@ catch {
         } catch { }
     }
     if (!$NoWindow -and !$CheckOnly) {
-        $displayMessage = $failureMessage + [Environment]::NewLine + [Environment]::NewLine + '日志位置：' + $logDirectory
+        $displayMessage = $failureMessage + [Environment]::NewLine + [Environment]::NewLine + 'Registros em: ' + $logDirectory
         try {
             Add-Type -AssemblyName System.Windows.Forms
-            [void][Windows.Forms.MessageBox]::Show($displayMessage, '趋势判断工作台启动失败', [Windows.Forms.MessageBoxButtons]::OK, [Windows.Forms.MessageBoxIcon]::Error)
+            [void][Windows.Forms.MessageBox]::Show($displayMessage, 'Falha ao iniciar a Estação de Tendências', [Windows.Forms.MessageBoxButtons]::OK, [Windows.Forms.MessageBoxIcon]::Error)
         } catch {
             $popupShell = New-Object -ComObject WScript.Shell
-            [void]$popupShell.Popup($displayMessage, 0, '趋势判断工作台启动失败', 16)
+            [void]$popupShell.Popup($displayMessage, 0, 'Falha ao iniciar a Estação de Tendências', 16)
         }
     }
     Write-Error $failureMessage -ErrorAction Continue

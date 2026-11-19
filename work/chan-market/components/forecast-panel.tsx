@@ -1,11 +1,13 @@
+// Modificado para trend-workbench-br: suporte a pt-BR e identidade própria.
 import type { MarketForecast, ReadyForecastSide } from '@/lib/forecast-types';
+import { localeFor, pickText } from '../lib/i18n-pt.ts';
 import { useLanguage, type Language } from '@/lib/language';
 import { priceText } from './terminal-chart';
 import { forecastCondition, forecastKind, forecastSummary, forecastTargetLabel } from './forecast-copy';
 import ForecastTitleText from './forecast-title-text';
 
 function ForecastLevels({side,language,alternative=false}:{side:ReadyForecastSide;language:Language;alternative?:boolean}) {
-  const t=(zh:string,en:string)=>language==='zh'?zh:en;
+  const t=(zh:string,en:string)=>pickText(language,zh,en);
   return <article className={`forecast-side ${side.side}${alternative?' alternative':''}`} data-testid={`forecast-side-${side.side}`}>
     <header><h3>{side.side==='long'?t('做多方案','Long setup'):t('做空方案','Short setup')}{alternative&&t(' · 备选',' · Alternative')}</h3><span>{forecastKind(side,language)}</span></header>
     <div className="forecast-zone"><span>{t('入场区间','Entry zone')}</span><strong>{priceText(side.zoneLow)} – {priceText(side.zoneHigh)}</strong></div>
@@ -19,7 +21,7 @@ function ForecastLevels({side,language,alternative=false}:{side:ReadyForecastSid
 
 export default function ForecastPanel({forecast,dataFresh=true,language:override}:{forecast:MarketForecast;dataFresh?:boolean;language?:Language}) {
   const languageContext=useLanguage(),language=override??languageContext.language;
-  const t=(zh:string,en:string)=>language==='zh'?zh:en,locale=language==='zh'?'zh-CN':'en-US';
+  const t=(zh:string,en:string)=>pickText(language,zh,en),locale=localeFor(language);
   const time=(value:number|null)=>value===null?'—':new Date(value*1000).toLocaleString(locale,{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false});
   const primary=forecast.direction==='neutral'?null:forecast[forecast.direction];
   const other=forecast.direction==='long'?forecast.short:forecast.long;

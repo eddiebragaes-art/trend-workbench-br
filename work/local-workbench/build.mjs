@@ -1,3 +1,4 @@
+// Modificado para trend-workbench-br: título e idioma da página em português.
 import { build } from '../chan-market/node_modules/esbuild/lib/main.js';
 import { readFile, writeFile, mkdir, copyFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
@@ -31,5 +32,5 @@ const validationSummary = {available: false, matchesInstalledBuild: false};
 await writeFile(path.join(app,'public/forecast-validation.json'),JSON.stringify(validationSummary));
 await copyFile(path.join(here,'server.mjs'),path.join(app,'server.mjs'));
 await copyFile(path.join(here,'network-bootstrap.mjs'),path.join(app,'network-bootstrap.mjs'));
-await writeFile(path.join(app,'public/index.html'),'<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"><title>趋势判断工作台</title><link rel="icon" href="/favicon.svg"><link rel="stylesheet" href="/style.css"></head><body><div id="root"></div><noscript>请在此独立窗口中启用 JavaScript。</noscript><script type="module" src="/app.js"></script></body></html>');
+await writeFile(path.join(app,'public/index.html'),'<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"><title>Estação de Tendências</title><link rel="icon" href="/favicon.svg"><link rel="stylesheet" href="/style.css"></head><body><div id="root"></div><noscript>Ative o JavaScript nesta janela.</noscript><script type="module" src="/app.js"></script></body></html>');
 console.log(`Built shared desktop assets in ${app}`);

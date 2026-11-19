@@ -1,6 +1,8 @@
+// Modificado para trend-workbench-br: suporte a pt-BR.
+import { analysisToPt } from './analysis-i18n-pt.ts';
 import type { Analysis, Factor, Scenario, Signal, TradeDecision, TradePlan, TradeSetup } from './market-types';
 
-export type AnalysisLanguage = 'zh' | 'en';
+export type AnalysisLanguage = 'zh' | 'en' | 'pt';
 const fmt = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: Math.min(12, Math.max(2, 5 - Math.floor(Math.log10(Math.abs(n) || 1)))) });
 const statusLabels = { untriggered: 'Not triggered', triggered: 'Triggered', invalidated: 'Invalidated', target_reached: 'Target reached' } as const;
 
@@ -58,6 +60,19 @@ function signalEn(s: Signal): Signal {
     reason: buy
       ? 'After an upward departure, the confirmed return segment remains above the center high. Recursive lower-level completion has not been verified; this is a third-buy-like signal.'
       : 'After a downward departure, the confirmed return segment remains below the center low. Recursive lower-level completion has not been verified; this is a third-sell-like signal.',
+  };
+  // Adicionado em trend-workbench-br: 1ª e 2ª compra/venda.
+  if (s.type.startsWith('first-')) return {
+    ...s, label: buy ? '1B' : '1S',
+    reason: buy
+      ? 'A bullish divergence ends a downtrend with two separated centers: a same-direction segment makes a new low with a smaller MACD histogram area. This is a first-buy candidate; recursive lower levels have not been verified.'
+      : 'A bearish divergence ends an uptrend with two separated centers: a same-direction segment makes a new high with a smaller MACD histogram area. This is a first-sell candidate; recursive lower levels have not been verified.',
+  };
+  if (s.type.startsWith('second-')) return {
+    ...s, label: buy ? '2B' : '2S',
+    reason: buy
+      ? 'After the first buy point, the first upward segment was followed by a confirmed pullback segment that did not break below the first-buy low. This is a second-buy candidate; recursive lower levels have not been verified.'
+      : 'After the first sell point, the first downward segment was followed by a confirmed rebound segment that did not break above the first-sell high. This is a second-sell candidate; recursive lower levels have not been verified.',
   };
   const trending = s.type.startsWith('trend-');
   return {
@@ -159,6 +174,7 @@ function decisionEn(d: TradeDecision, plans: TradePlan[]): TradeDecision {
 /** Localize display text without changing any prices, timestamps, IDs or model states. */
 export function translateAnalysis(analysis: Analysis, language: AnalysisLanguage): Analysis {
   if (language === 'zh') return analysis;
+  if (language === 'pt') return analysisToPt(translateAnalysis(analysis, 'en'));
   const extended = analysis as Analysis & { tradePlans?: TradePlan[]; decision?: TradeDecision };
   const tradePlans = extended.tradePlans?.map(planEn);
   const biasLabels: Record<string, string> = { '样本不足': 'Insufficient history', '结构偏多': 'Bullish structure', '结构偏空': 'Bearish structure', '结构均衡': 'Balanced structure' };

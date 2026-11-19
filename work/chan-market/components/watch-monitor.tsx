@@ -1,9 +1,11 @@
 "use client";
+// Modificado para trend-workbench-br: suporte a pt-BR e identidade própria.
+import { localeFor, pickText } from '../lib/i18n-pt.ts';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Instrument, Interval } from '@/lib/market-types';
 import { useLanguage } from '@/lib/language';
 import { createWatchMonitor, selectWatchInstruments, type WatchRow, type WatchSnapshot } from '@/lib/watch-monitor';
-import { marketDisplayText } from '@/lib/market-i18n';
+import { marketDisplayText, translateInstrumentName } from '@/lib/market-i18n';
 import { priceText } from './terminal-chart';
 
 export interface WatchMonitorProps {
@@ -31,8 +33,8 @@ export default function WatchMonitor({watchlist,interval,enabled:controlledEnabl
     <p className="watch-monitor-note">{t(`当前周期 ${interval}，监测前 ${instruments.length} 个自选（最多12个）。只提醒新变化，关闭窗口后停止。`,`Interval ${interval}; monitoring the first ${instruments.length} saved symbols (maximum 12). Alerts cover new changes only. Closing the window stops monitoring.`)}</p>
     {!instruments.length?<p className="empty-watch">{t('先把标的加入自选，再开启监测。','Add instruments to the watchlist before starting.')}</p>:<div className="watch-monitor-table-wrap"><table className="watch-monitor-table"><thead><tr><th>{t('标的','Symbol')}</th><th>{t('行情状态','Feed state')}</th><th>{t('最近K线价格','Latest bar price')}</th><th>{t('最近检查','Last check')}</th></tr></thead><tbody>{instruments.map(instrument=>{
       const candidate=rows[`${instrument.market}:${instrument.symbol}`],row=candidate?.interval===interval?candidate:undefined;
-      const state=!enabled?t('已停止','Stopped'):row?.state==='loading'?t('获取中','Fetching'):row?.state==='waiting'||!row?t('排队中','Queued'):row.health?(language==='zh'?row.health.label:row.health.labelEn):t('等待数据','Waiting');
-      return <tr key={instrument.id}><td><b>{instrument.symbol}</b><small>{instrument.name}</small></td><td className={`feed-${row?.health?.state||'unknown'}`} title={row?.health?marketDisplayText(t(row.health.detail,row.health.detailEn),language):''}>{state}</td><td title={row?.source ? marketDisplayText(row.source,language) : undefined}>{row?.price!=null?priceText(row.price):'—'}</td><td>{row?.checkedAtMs?new Date(row.checkedAtMs).toLocaleTimeString(locale,{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}):'—'}</td></tr>;
+      const state=!enabled?t('已停止','Stopped'):row?.state==='loading'?t('获取中','Fetching'):row?.state==='waiting'||!row?t('排队中','Queued'):row.health?t(row.health.label,row.health.labelEn):t('等待数据','Waiting');
+      return <tr key={instrument.id}><td><b>{instrument.symbol}</b><small>{translateInstrumentName(instrument.name,language)}</small></td><td className={`feed-${row?.health?.state||'unknown'}`} title={row?.health?marketDisplayText(t(row.health.detail,row.health.detailEn),language):''}>{state}</td><td title={row?.source ? marketDisplayText(row.source,language) : undefined}>{row?.price!=null?priceText(row.price):'—'}</td><td>{row?.checkedAtMs?new Date(row.checkedAtMs).toLocaleTimeString(locale,{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}):'—'}</td></tr>;
     })}</tbody></table></div>}
   </section>;
 }

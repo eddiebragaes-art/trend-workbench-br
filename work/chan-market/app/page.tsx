@@ -1,12 +1,14 @@
 "use client";
+// Modificado para trend-workbench-br: suporte a pt-BR e identidade própria.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Search, ArrowUpRight, ArrowDownRight, ChevronDown, ChevronRight, RefreshCw, Star, X, Activity, Globe2, Layers3, Radio, Download, Upload, StepBack, StepForward, Play, Pause, RotateCcw, AlertTriangle, Check, BarChart3, Crosshair, CheckCircle2, Send } from 'lucide-react';
+import { Search, ArrowUpRight, ArrowDownRight, ChevronDown, ChevronRight, RefreshCw, Star, X, Activity, Globe2, Layers3, Radio, Download, Upload, StepBack, StepForward, Play, Pause, RotateCcw, AlertTriangle, Check, BarChart3, Crosshair, CheckCircle2, Send, Camera } from 'lucide-react';
+import { captureChartPng, captureFileName } from '../lib/chart-capture.ts';
 import {parseCSV,serializeCSV} from '@/lib/csv';
 import TerminalChart, {priceText, type Layers} from '@/components/terminal-chart';
 import {analyze} from '@/lib/chan';
 import {planSessionKey,readPlanSession} from '@/lib/plan-session';
-import {LanguageProvider,useLanguage} from '@/lib/language';
+import {LANGUAGES,LanguageProvider,useLanguage} from '@/lib/language';
 import {WORKBENCH_BRAND} from '@/lib/workbench-brand';
 import {translateAnalysis} from '@/lib/analysis-i18n';
 import {marketDisplayText,marketLoadErrorText,marketVenueSuffix,translateInstrumentName} from '@/lib/market-i18n';
@@ -25,6 +27,8 @@ import CenterLayerSelector,{type CenterLayerMode} from '@/components/center-laye
 import {buildStrokeCenters} from '@/lib/center-layers';
 import WatchMonitor from '@/components/watch-monitor';
 import ForecastActivity from '@/components/forecast-activity';
+import PaperAccountPanel from '@/components/paper-account';
+import PropLab from '@/components/prop-lab';
 import ForecastValidationPanel from '@/components/forecast-validation-panel';
 import type {Analysis,Instrument,Interval,Market,MarketData} from '@/lib/market-types';
 
@@ -45,8 +49,18 @@ const PRESETS: Instrument[]=[
   {id:'cn:000001.SZ',symbol:'000001.SZ',name:'平安银行',market:'cn',exchange:'深交所',currency:'CNY'},
   {id:'cn:601318.SH',symbol:'601318.SH',name:'中国平安',market:'cn',exchange:'上交所',currency:'CNY'},
   {id:'cn:002594.SZ',symbol:'002594.SZ',name:'比亚迪',market:'cn',exchange:'深交所',currency:'CNY'},
+  {id:'br:PETR4',symbol:'PETR4',name:'Petrobras PN',market:'br',exchange:'B3',currency:'BRL'},
+  {id:'br:VALE3',symbol:'VALE3',name:'Vale ON',market:'br',exchange:'B3',currency:'BRL'},
+  {id:'br:ITUB4',symbol:'ITUB4',name:'Itaú Unibanco PN',market:'br',exchange:'B3',currency:'BRL'},
+  {id:'br:BOVA11',symbol:'BOVA11',name:'iShares Ibovespa ETF',market:'br',exchange:'B3',currency:'BRL'},
+  {id:'br:^BVSP',symbol:'^BVSP',name:'Ibovespa',market:'br',exchange:'B3',currency:'BRL'},
+  {id:'fut:NAS100',symbol:'NAS100',name:'Nasdaq 100 (E-mini futures)',market:'fut',exchange:'CME',currency:'USD'},
+  {id:'fut:US30',symbol:'US30',name:'Dow Jones 30 (E-mini futures)',market:'fut',exchange:'CBOT',currency:'USD'},
+  {id:'fut:XAUUSD',symbol:'XAUUSD',name:'Gold (COMEX futures)',market:'fut',exchange:'COMEX',currency:'USD'},
+  {id:'fut:USOIL',symbol:'USOIL',name:'WTI crude oil (NYMEX futures)',market:'fut',exchange:'NYMEX',currency:'USD'},
+  {id:'fut:US500',symbol:'US500',name:'S&P 500 (E-mini futures)',market:'fut',exchange:'CME',currency:'USD'},
 ];
-const MARKETS: {id:Market;title:string;en:string}[]=[{id:'crypto',title:'加密货币',en:'CRYPTO'},{id:'us',title:'美股',en:'US EQUITIES'},{id:'cn',title:'A股',en:'CHINA A'}];
+const MARKETS: {id:Market;title:string;en:string}[]=[{id:'crypto',title:'加密货币',en:'CRYPTO'},{id:'us',title:'美股',en:'US EQUITIES'},{id:'cn',title:'A股',en:'CHINA A'},{id:'br',title:'巴西B3',en:'BRAZIL B3'},{id:'fut',title:'指数与商品',en:'INDICES & COMMODITIES'}];
 const INTERVALS:Interval[]=['1m','5m','15m','30m','1h','4h','1d','1w','1M'];
 const TIME_LABEL:Record<Interval,string>={'1m':'1分','5m':'5分','15m':'15分','30m':'30分','1h':'1小时','4h':'4小时','1d':'日线','1w':'周线','1M':'月线'};
 const initialLayers:Layers={strokes:true,segments:true,centers:true,signals:true,scenarios:false,fractals:false,setups:true};
@@ -91,7 +105,7 @@ function HomeContent(){
   const cancelPendingImport=useCallback(()=>{importGeneration.current++;},[]);
   // Hydrate the browser-owned watchlist after SSR; it has no server equivalent.
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(()=>{try{const stored=JSON.parse(localStorage.getItem('chan-watchlist-v1')||'null');if(Array.isArray(stored)&&stored.every(i=>i&&typeof i.id==='string'&&['crypto','us','cn'].includes(i.market)&&typeof i.symbol==='string'&&typeof i.name==='string'))setWatchlist(stored);}catch{}},[]);
+  useEffect(()=>{try{const stored=JSON.parse(localStorage.getItem('chan-watchlist-v1')||'null');if(Array.isArray(stored)&&stored.every(i=>i&&typeof i.id==='string'&&['crypto','us','cn','br','fut'].includes(i.market)&&typeof i.symbol==='string'&&typeof i.name==='string'))setWatchlist(stored);}catch{}},[]);
   const notify=useCallback((message:string)=>{setToast(message);setTimeout(()=>setToast(''),5500);},[]);
   const lastNotice=useRef<string|null>(null);
   useEffect(()=>{const notice=notices[0];if(!notice||lastNotice.current===notice.id)return;lastNotice.current=notice.id;const event=notice.intrabar?notice.type==='invalidation'?t('收到报价触及止损价','Received quote touched the stop-loss price'):notice.type==='target1'?t('收到报价触及第一止盈价','Received quote touched the take-profit 1 price'):t('收到报价触及第二止盈价','Received quote touched the take-profit 2 price'):notice.type==='condition-met'?t('预判条件满足','Outlook condition met'):notice.type==='invalidated'?t('止损价触及','Stop-loss price touched'):notice.type==='target1'?t('第一止盈价触及','Take-profit 1 price touched'):t('第二止盈价触及','Take-profit 2 price touched');notify(`${notice.symbol} · ${notice.interval} · ${event} ${priceText(notice.price)}`);},[notices,notify,t]);
@@ -171,8 +185,9 @@ function HomeContent(){
     if(i!==interval)chartFeed.cancel();
     setInterval(i);
   }
-  function switchMarket(m:Market){const p=PRESETS.find(i=>i.market===m)!;choose(p);chooseInterval(m==='crypto'?'1h':'1d');}
+  function switchMarket(m:Market){const p=PRESETS.find(i=>i.market===m)!;choose(p);chooseInterval(m==='crypto'||m==='fut'?'1h':'1d');}
   function star(i:Instrument){setWatchlist(prev=>{const next=prev.some(w=>w.id===i.id)?prev.filter(w=>w.id!==i.id):[...prev,i];localStorage.setItem('chan-watchlist-v1',JSON.stringify(next));return next;});}
+  async function captureChart(){const svg=document.querySelector<SVGSVGElement>('.chart-shell svg.terminal-chart');if(!svg){notify(t('图表尚未加载。','The chart has not loaded yet.'));return;}try{const now=new Date(),label=t(TIME_LABEL[interval],({'1d':'Day','1w':'Week','1M':'Month'} as Partial<Record<Interval,string>>)[interval]||interval);const blob=await captureChartPng(svg,`${displaySymbol(selected.symbol)} · ${label}`,`${WORKBENCH_BRAND.name[language]} · ${now.toLocaleString(locale)}`);const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=captureFileName(selected.symbol,interval,now);a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);notify(t('已保存图表截图。','Chart screenshot saved.'));}catch{notify(t('截图失败，请重试。','Screenshot failed. Please try again.'));}}
   function exportCSV(){if(!candles.length)return;download(`${selected.symbol}-${interval}${replay?'_replay':''}.csv`,serializeCSV(candles),'text/csv;charset=utf-8');notify(t('已导出当前回放时点之前的K线，保留K线完成状态。','Exported bars up to the replay cursor, preserving closed status.'));}
   function exportAnalysis(){if(!analysis||!data)return;download(`${selected.symbol}-${interval}-analysis.json`,JSON.stringify({instrument:data.instrument,interval,source:data.source,adjustment:data.adjustment,asOf:data.asOf,delayNotice:data.delayNotice,lastCandle:last?.time,ruleVersion:analysis.ruleVersion,penMode,replay:replay!==null,candles,analysis,forecast:rawForecast,feedHealth:health},null,2),'application/json');}
   async function importFile(file:File){
@@ -183,7 +198,7 @@ function HomeContent(){
       const parsed=parseCSV(text);
       chartFeed.cancel();
       const symbol=file.name.replace(/\.csv$/i,'').slice(0,40)||'CSV';
-      const ins:Instrument={id:`${market}:csv-${symbol}`,symbol,name:'本地导入数据',market,exchange:'CSV',currency:market==='cn'?'CNY':'USD'};
+      const ins:Instrument={id:`${market}:csv-${symbol}`,symbol,name:'本地导入数据',market,exchange:'CSV',currency:market==='cn'?'CNY':market==='br'?'BRL':'USD'};
       const data:MarketData={instrument:ins,interval,candles:parsed,source:`本地CSV · ${file.name}`,asOf:new Date().toISOString(),delayNotice:'用户提供的历史数据；保留closed状态，缺少closed列时按已完成处理。',adjustment:'由CSV原始数据决定',warnings:['导入数据未与交易所校验；请确认时区、复权口径和所选周期。'],availableIntervals:[interval]};
       setImported(true);setSelected(ins);setSnapshot({data,receivedAt:Date.now(),higher:{interval:higherInterval(market,interval),status:'imported'}});
       setReplay(null);setPlaying(false);setLoading(false);setFeedError(null);
@@ -211,22 +226,22 @@ function HomeContent(){
           <span>{t('社区交流','Community')}</span>
         </a>
       </nav>
-      <div className="top-right"><button type="button" className="top-refresh" disabled={loading||imported} aria-busy={loading} aria-label={t('刷新行情','Refresh market data')} title={imported?t('本地导入数据无需在线刷新','Imported data does not need an online refresh'):t('刷新当前标的行情和分析','Refresh this instrument and its analysis')} onClick={()=>void fetchData()}><RefreshCw size={17} className={loading?'spin':''} aria-hidden="true"/><span>{loading?t('刷新中','Refreshing'):t('刷新行情','Refresh')}</span></button><span className={`connection ${error?'warning':''}`}><i/>{loading?t('连接中','Connecting'):error?(data?t('行情未更新','Refresh failed'):t('暂无行情','Data unavailable')):imported?t('本地数据','Local data'):replay!==null?t('历史回放 · 刷新暂停','Replay · refresh paused'):t('公开行情 · 30s刷新','Public feed · 30s refresh')}</span><div className="language-switch" role="group" aria-label={t('界面语言','Interface language')}><button aria-pressed={language==='zh'} className={language==='zh'?'active':''} onClick={()=>setLanguage('zh')}>中文</button><button aria-pressed={language==='en'} className={language==='en'?'active':''} onClick={()=>setLanguage('en')}>EN</button></div><span className="avatar">{t('观','C')}</span></div>
+      <div className="top-right"><button type="button" className="top-refresh" disabled={loading||imported} aria-busy={loading} aria-label={t('刷新行情','Refresh market data')} title={imported?t('本地导入数据无需在线刷新','Imported data does not need an online refresh'):t('刷新当前标的行情和分析','Refresh this instrument and its analysis')} onClick={()=>void fetchData()}><RefreshCw size={17} className={loading?'spin':''} aria-hidden="true"/><span>{loading?t('刷新中','Refreshing'):t('刷新行情','Refresh')}</span></button><span className={`connection ${error?'warning':''}`}><i/>{loading?t('连接中','Connecting'):error?(data?t('行情未更新','Refresh failed'):t('暂无行情','Data unavailable')):imported?t('本地数据','Local data'):replay!==null?t('历史回放 · 刷新暂停','Replay · refresh paused'):t('公开行情 · 30s刷新','Public feed · 30s refresh')}</span><div className="language-switch" role="group" aria-label={t('界面语言','Interface language')}>{LANGUAGES.map(code=><button key={code} aria-pressed={language===code} className={language===code?'active':''} onClick={()=>setLanguage(code)}>{code==='zh'?'中文':code.toUpperCase()}</button>)}</div><span className="avatar">{t('观','C')}</span></div>
     </header>
     <aside className="sidebar">
       <div className="sidebar-heading"><span>{t("市场导航","Markets")}</span><Globe2 size={14}/></div>
-      <div className="market-menu">{MARKETS.map(m=><button key={m.id} className={market===m.id?'active':''} onClick={()=>switchMarket(m.id)}><span className="market-icon">{m.id==='crypto'?'₿':m.id==='us'?'$':'A'}</span><span>{t(m.title,m.en)}<small>{m.en}</small></span>{market===m.id&&<span className="active-marker"/>}</button>)}</div>
+      <div className="market-menu">{MARKETS.map(m=><button key={m.id} className={market===m.id?'active':''} onClick={()=>switchMarket(m.id)}><span className="market-icon">{m.id==='crypto'?'₿':m.id==='us'?'$':m.id==='br'?'R$':m.id==='fut'?'◆':'A'}</span><span>{t(m.title,m.en)}{language!=='pt'&&<small>{m.en}</small>}</span>{market===m.id&&<span className="active-marker"/>}</button>)}</div>
       <div className="sidebar-tabs"><button className={watchTab==='all'?'active':''} onClick={()=>setWatchTab('all')}>{t("常用标的","Popular")}</button><button className={watchTab==='favorites'?'active':''} onClick={()=>setWatchTab('favorites')}>{t("我的自选 ","Watchlist ")}<span>{watchlist.length}</span></button></div>
       <div className="watch-list">{watchRows.map(i=><div className={`watch-row ${selected.id===i.id?'selected':''}`} key={i.id}><button onClick={()=>choose(i)}><span className={`asset-symbol ${i.market}`}>{i.symbol==='BTCUSDT'?'₿':i.symbol==='ETHUSDT'?'Ξ':i.symbol.slice(0,1)}</span><span><b>{displaySymbol(i.symbol)}</b><small>{instrumentName(i.name)}</small></span></button><button className="watch-star" onClick={()=>star(i)} title={watchlist.some(w=>w.id===i.id)?t('移出自选','Remove from watchlist'):t('加入自选','Add to watchlist')} aria-label={`${watchlist.some(w=>w.id===i.id)?t('移出自选','Remove from watchlist'):t('加入自选','Add to watchlist')} ${i.symbol}`}><Star size={12} fill={watchlist.some(w=>w.id===i.id)?'currentColor':'none'}/></button></div>)}{!watchRows.length&&<p className="empty-watch">{t("搜索标的后点星号，建立你的观察列表。","Search for an instrument and star it to build your watchlist.")}</p>}</div>
       <button className="add-symbol" onClick={()=>setSearchOpen(true)}><Search size={14}/>{t('搜索更多标的','Find instruments')} <span>/</span></button>
-      <div className="sidebar-bottom"><span className="eyebrow">OBSERVE. DEFINE. ACT.</span><p>{t('让每一次判断','Every decision,')}<br/>{t('都有结构可循。','grounded in structure.')}</p><span className="version">{t("研究终端 · v1.3","Research terminal · v1.3")}</span></div>
+      <div className="sidebar-bottom"><span className="eyebrow">{t('OBSERVE. DEFINE. ACT.','OBSERVE. DEFINE. ACT.')}</span><p>{t('让每一次判断','Every decision,')}<br/>{t('都有结构可循。','grounded in structure.')}</p><span className="version">{t("研究终端 · v1.3","Research terminal · v1.3")}</span><a className="original-credit" href={WORKBENCH_BRAND.originalUrl} target="_blank" rel="noopener noreferrer" title={t('原版项目源码','Original project source')}>{t('基于原版项目 Trend Workbench','Based on the original Trend Workbench')}</a></div>
     </aside>
     <main className="workspace">
-      <div className="page-heading"><div><div className="eyebrow">MARKET INTELLIGENCE <span>/ {MARKETS.find(m=>m.id===market)?.en}</span></div><h1>{t('洞察结构，跟随走势','Read structure. Follow price')}<span className="heading-dot">.</span></h1></div><button className="global-search" aria-label={t('搜索标的','Search instruments')} onClick={()=>setSearchOpen(true)}><Search size={16}/><span>{t("搜索代码、币种或公司名称","Search symbol, crypto or company")}</span><kbd>/</kbd></button></div>
+      <div className="page-heading"><div><div className="eyebrow">{t('MARKET INTELLIGENCE','MARKET INTELLIGENCE')} <span>/ {(m=>m?t(m.en,m.en):'')(MARKETS.find(m=>m.id===market))}</span></div><h1>{t('洞察结构，跟随走势','Read structure. Follow price')}<span className="heading-dot">.</span></h1></div><button className="global-search" aria-label={t('搜索标的','Search instruments')} onClick={()=>setSearchOpen(true)}><Search size={16}/><span>{t("搜索代码、币种或公司名称","Search symbol, crypto or company")}</span><kbd>/</kbd></button></div>
       <div className="workspace-grid">
         <section className="chart-panel panel">
           <div className="quote-heading"><div className="instrument-identity"><span className={`asset-big ${market}`}>{selected.symbol==='BTCUSDT'?'₿':selected.symbol==='ETHUSDT'?'Ξ':selected.symbol.slice(0,1)}</span><div><button className="instrument-selector" onClick={()=>setSearchOpen(true)}>{displaySymbol(currentInstrument.symbol)}<ChevronDown size={15}/></button><p>{instrumentName(currentInstrument.name)}<span>{marketVenueSuffix(currentInstrument.exchange,language)}</span></p></div><button className={`favorite-button ${watchlist.some(w=>w.id===selected.id)?'selected':''}`} disabled={imported} onClick={()=>star(selected)} aria-label={t("切换当前标的自选","Toggle watchlist")}><Star size={17} fill={watchlist.some(w=>w.id===selected.id)?'currentColor':'none'}/></button></div><div className="quote-price"><strong>{last?priceText(last.close):'—'}</strong><span className={change>=0?'positive':'negative'}>{last&&prior?`${change>=0?'+':''}${change.toFixed(2)}%`:'—'} <small>{t("较前一根","vs previous bar")}</small></span></div></div>
-          <div className="chart-toolbar"><div className="interval-buttons">{INTERVALS.map(i=><button key={i} className={interval===i?'active':''} disabled={!available.includes(i)||imported} onClick={()=>chooseInterval(i)}>{t(TIME_LABEL[i],({'1d':'Day','1w':'Week','1M':'Month'} as Partial<Record<Interval,string>>)[i]||i)}</button>)}</div><div className="chart-actions"><button className="icon-button" disabled={loading||imported} onClick={()=>void fetchData()} title={t("刷新行情","Refresh market data")} aria-label={t("刷新行情","Refresh market data")}><RefreshCw size={14} className={loading?'spin':''}/></button><button className="icon-button" disabled={!data} onClick={exportCSV} title={t("导出历史K线CSV","Export candle history as CSV")} aria-label={t("导出CSV","Export CSV")}><Download size={14}/></button><button className="icon-button" onClick={()=>fileInput.current?.click()} title={t("导入CSV","Import CSV")} aria-label={t("导入CSV","Import CSV")}><Upload size={14}/></button></div></div>
+          <div className="chart-toolbar"><div className="interval-buttons">{INTERVALS.map(i=><button key={i} className={interval===i?'active':''} disabled={!available.includes(i)||imported} onClick={()=>chooseInterval(i)}>{t(TIME_LABEL[i],({'1d':'Day','1w':'Week','1M':'Month'} as Partial<Record<Interval,string>>)[i]||i)}</button>)}</div><div className="chart-actions"><button className="icon-button" disabled={loading||imported} onClick={()=>void fetchData()} title={t("刷新行情","Refresh market data")} aria-label={t("刷新行情","Refresh market data")}><RefreshCw size={14} className={loading?'spin':''}/></button><button className="icon-button" disabled={!data} onClick={exportCSV} title={t("导出历史K线CSV","Export candle history as CSV")} aria-label={t("导出CSV","Export CSV")}><Download size={14}/></button><button className="icon-button" disabled={!data} onClick={()=>void captureChart()} title={t("保存图表截图（PNG）","Save chart screenshot (PNG)")} aria-label={t("保存图表截图","Save chart screenshot")}><Camera size={14}/></button><button className="icon-button" onClick={()=>fileInput.current?.click()} title={t("导入CSV","Import CSV")} aria-label={t("导入CSV","Import CSV")}><Upload size={14}/></button></div></div>
           <div className="layer-toolbar"><span><Layers3 size={12}/>{t('结构图层','Layers')}</span>{([['setups','点位预判','Outlook'],['strokes','笔','Strokes'],['segments','线段','Segments'],['centers','中枢','Centers'],['signals','历史信号','Signals'],['fractals','分型','Fractals']] as const).map(([key,zh,en])=><button type="button" key={key} aria-pressed={layers[key]} className={layers[key]?'active':''} onClick={()=>setLayers(l=>({...l,[key]:!l[key]}))}><span className="layer-state-indicator" aria-hidden="true">{layers[key]&&<Check size={13} strokeWidth={3}/>}</span>{t(zh,en)}</button>)}{layers.centers&&<CenterLayerSelector value={centerLayer} onChange={setCenterLayer}/>}</div>
           {error&&<div className="data-error" role="alert"><AlertTriangle size={20}/><div>
             <b>{displaySymbol(selected.symbol)} · {t(TIME_LABEL[interval],interval)} · {data?t('行情更新失败','Refresh failed'):t('暂无行情','Data unavailable')}</b>
@@ -237,7 +252,7 @@ function HomeContent(){
           {(data||!error)&&<>
           <TerminalChart key={`${selected.id}-${interval}-${imported}`} candles={candles} analysis={analysis} layers={layers} symbol={selected.symbol} interval={interval} loading={loading&&!data} forecast={rawForecast??undefined} dataFresh={displayForecast} strokeCenters={strokeCenters} centerLayer={centerLayer}/>
           <div className="replay-toolbar"><span><RotateCcw size={13}/>{replay===null?t('历史回放','Replay'):t('正在回放','Replaying')}</span><button aria-label={t("回退一根K线","Previous bar")} disabled={!data} onClick={()=>{setPlaying(false);setReplay(Math.max(Math.min(3,data!.candles.length),(replay??data!.candles.length)-1));}}><StepBack size={14}/></button><button className={playing?'active':''} aria-label={playing?t('暂停回放','Pause replay'):t('播放历史','Play history')} disabled={!data} onClick={()=>{if(replay===null)setReplay(Math.min(80,data!.candles.length-1));setPlaying(p=>!p);}}>{playing?<Pause size={14}/>:<Play size={14}/>}</button><button aria-label={t("前进一根K线","Next bar")} disabled={!data||replay===null} onClick={()=>setReplay(r=>r!==null&&r+1<data!.candles.length?r+1:null)}><StepForward size={14}/></button><input aria-label={t("历史回放进度","Replay position")} type="range" min={Math.min(3,data?.candles.length||3)} max={data?.candles.length||35} value={replay??data?.candles.length??35} disabled={!data} onChange={e=>{setPlaying(false);const n=Number(e.target.value);setReplay(n===data!.candles.length?null:n);}}/><span className="replay-counter">{candles.length} / {data?.candles.length||0}</span><button className="return-live" disabled={replay===null} onClick={()=>{setReplay(null);setPlaying(false);}}>{t("回到最新","Latest")}</button></div>
-          <div className="data-source"><span><Radio size={11}/>{data?mt(data.source):t('等待行情源','Waiting for data')} · {data?mt(data.adjustment):'—'}{replay!==null&&<b> · {t('历史回放','Replay')}</b>}</span>{data&&!imported&&interval==='4h'&&market!=='crypto'&&<span>{market==='cn'?t('4H：每交易日一根','4H: one candle per trading day'):t('4H：首段4小时，尾段2.5小时','4H: first bar 4 hours; closing bar 2.5 hours')}</span>}<span>{candles.length?`${readableTime(candles[0].time,locale)} — ${readableTime(last!.time,locale)}`:t('数据时间 —','Data time —')}</span></div>
+          <div className="data-source"><span><Radio size={11}/>{data?mt(data.source):t('等待行情源','Waiting for data')} · {data?mt(data.adjustment):'—'}{replay!==null&&<b> · {t('历史回放','Replay')}</b>}</span>{data&&!imported&&interval==='4h'&&market!=='crypto'&&<span>{market==='cn'?t('4H：每交易日一根','4H: one candle per trading day'):market==='br'?t('4H：10:00–14:00，14:00–收盘','4H: 10:00–14:00, then 14:00–close'):market==='fut'?t('4H：按纽约时间18:00起每4小时','4H: every 4 hours from 18:00 New York time'):t('4H：首段4小时，尾段2.5小时','4H: first bar 4 hours; closing bar 2.5 hours')}</span>}<span>{candles.length?`${readableTime(candles[0].time,locale)} — ${readableTime(last!.time,locale)}`:t('数据时间 —','Data time —')}</span></div>
           <HistoryCoverage data={data}/>
           </>}
         </section>
@@ -252,6 +267,8 @@ function HomeContent(){
       <footer className="workspace-footer"><span>{data?mt(data.delayNotice):t('加密货币 · 美股 · A股，统一结构视角。','Crypto · US equities · China A-shares, one structural view.')}</span></footer>
       <WatchMonitor watchlist={watchlist} interval={interval} enabled={monitorEnabled&&live} onEnabledChange={setMonitorEnabled} onSnapshot={onWatchSnapshot}/>
       <ForecastActivity journal={journal} data={data} notices={notices} saved={journalSaved}/>
+      <PaperAccountPanel journal={journal}/>
+      <PropLab data={data} watchlist={watchlist} interval={interval}/>
       <ForecastValidationPanel/>
     </main>
     <input type="file" accept=".csv,text/csv" ref={fileInput} hidden onChange={e=>{const f=e.target.files?.[0];e.target.value='';if(f)void importFile(f);}}/>
