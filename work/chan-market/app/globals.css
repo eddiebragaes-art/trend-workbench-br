@@ -1,3 +1,4 @@
+/* Modificado para trend-workbench-br: crédito ao projeto original. */
 @import "tailwindcss";
 :root{--background:#0b1118;--foreground:#d9e3e8;--card:#101923;--border:#24313c;--muted:#182530;--muted-foreground:#7c909f;--primary:#54d5ac;--ring:#54d5ac;--green:#54d5ac;--red:#ee8383;--gold:#c8ad79;--mono:ui-monospace,SFMono-Regular,Consolas,monospace;color-scheme:dark}
 @theme inline{--color-background:var(--background);--color-foreground:var(--foreground);--color-card:var(--card);--color-border:var(--border);--color-primary:var(--primary);--color-muted:var(--muted);--color-muted-foreground:var(--muted-foreground);--color-ring:var(--ring);--font-sans:"Microsoft YaHei UI","Microsoft YaHei","PingFang SC","Segoe UI",sans-serif}
@@ -394,3 +395,7 @@ html[lang=en] .topbar .brand b { font-size: 18px; letter-spacing: 0; }
   .topbar .language-switch button { padding: 5px 6px; }
   .official-links a { padding-inline: 5px; gap: 5px; }
 }
+
+/* Adicionado em trend-workbench-br: crédito ao projeto original na barra lateral. */
+.original-credit{display:block;margin-top:10px;font-size:11px;color:inherit;opacity:.7;text-decoration:underline}
+.original-credit:hover{opacity:1}

@@ -6,7 +6,7 @@ import {useLanguage,type Language} from '@/lib/language';
 import {loadForecastValidationReport,type ValidationReportResult,type ValidationSummary} from '@/lib/forecast-validation-report';
 import {forecastPeriod} from './forecast-copy';
 
-const marketNames={crypto:['加密货币','Crypto'],us:['美股','US equities'],cn:['A股','A-shares']} as const;
+const marketNames={crypto:['加密货币','Crypto'],us:['美股','US equities'],cn:['A股','A-shares'],br:['巴西B3','B3 equities']} as const;
 export function ForecastValidationResults({summary,language}:{summary:ValidationSummary;language:Language}) {
   const t=(zh:string,en:string)=>pickText(language,zh,en);
   const insufficient=summary.results.some(r=>r.baseline.completed<30||r.shadow.completed<30||r.baseline.sampleStatus==='insufficient'||r.shadow.sampleStatus==='insufficient');

@@ -1,5 +1,6 @@
+// Modificado para trend-workbench-br: mercado brasileiro (B3).
 import type { Candle, Interval, MarketData } from './market-types';
-import { aggregateEquityFourHour } from './equity-four-hour.ts';
+import { aggregateB3FourHour, aggregateEquityFourHour } from './equity-four-hour.ts';
 import { candleAvailableAt, exchangeClock, higherInterval } from './timeframe-context.ts';
 
 export const SAME_SOURCE_AGGREGATION = ' · 真实同源聚合';
@@ -70,14 +71,19 @@ function equities(primary:MarketData, target:Interval, asOf:number):Aggregation|
   const source=primary.source;
   const endLabelled=market==='cn' && /^(?:东方财富|腾讯证券|新浪财经)/.test(source)
     || market==='us' && /^东方财富/.test(source);
-  const startLabelled=market==='us' && /^Yahoo Finance/i.test(source);
+  const startLabelled=(market==='us'||market==='br') && /^Yahoo Finance/i.test(source);
   if(!endLabelled&&!startLabelled)return null;
-  if(target==='4h'&&(primary.interval==='30m'||primary.interval==='1h')) {
+  if(market==='br'&&target==='4h') {
+    if(primary.interval!=='1h')return null;
+    const result=aggregateB3FourHour(primary.candles,asOf);
+    return {candles:result.candles.filter(c=>c.closed===true),skipped:result.discardedBuckets+result.excludedRows+result.candles.filter(c=>c.closed!==true).length};
+  }
+  if(market!=='br'&&target==='4h'&&(primary.interval==='30m'||primary.interval==='1h')) {
     const result=aggregateEquityFourHour(primary.candles,{market,sourceInterval:primary.interval,timestamp:endLabelled?'end':'start',now:asOf});
     return {candles:result.candles.filter(c=>c.closed===true),skipped:result.discardedBuckets+result.excludedRows+result.candles.filter(c=>c.closed!==true).length};
   }
   const weekly=target==='1w'&&(primary.interval==='1d'||market==='cn'&&primary.interval==='4h');
-  const daily=target==='1d'&&(market==='cn'&&primary.interval==='1h'||market==='us'&&primary.interval==='4h');
+  const daily=target==='1d'&&(market==='cn'&&primary.interval==='1h'||(market==='us'||market==='br')&&primary.interval==='4h');
   if(!weekly&&!daily)return null;
   const groups=new Map<number,{time:number;rows:Candle[];slots:number[]}>();
   let skipped=0;
@@ -97,7 +103,7 @@ function equities(primary:MarketData, target:Interval, asOf:number):Aggregation|
     groups.set(key,group);
   }
   const candles:Candle[]=[];
-  const expected=weekly?[1,2,3,4,5]:market==='cn'?[630,690,840,900]:[570,810];
+  const expected=weekly?[1,2,3,4,5]:market==='cn'?[630,690,840,900]:market==='br'?[600,840]:[570,810];
   for(const group of groups.values()) {
     const {rows,slots}=group;
     const candle=merge(rows,group.time);

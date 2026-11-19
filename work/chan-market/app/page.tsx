@@ -46,8 +46,13 @@ const PRESETS: Instrument[]=[
   {id:'cn:000001.SZ',symbol:'000001.SZ',name:'平安银行',market:'cn',exchange:'深交所',currency:'CNY'},
   {id:'cn:601318.SH',symbol:'601318.SH',name:'中国平安',market:'cn',exchange:'上交所',currency:'CNY'},
   {id:'cn:002594.SZ',symbol:'002594.SZ',name:'比亚迪',market:'cn',exchange:'深交所',currency:'CNY'},
+  {id:'br:PETR4',symbol:'PETR4',name:'Petrobras PN',market:'br',exchange:'B3',currency:'BRL'},
+  {id:'br:VALE3',symbol:'VALE3',name:'Vale ON',market:'br',exchange:'B3',currency:'BRL'},
+  {id:'br:ITUB4',symbol:'ITUB4',name:'Itaú Unibanco PN',market:'br',exchange:'B3',currency:'BRL'},
+  {id:'br:BOVA11',symbol:'BOVA11',name:'iShares Ibovespa ETF',market:'br',exchange:'B3',currency:'BRL'},
+  {id:'br:^BVSP',symbol:'^BVSP',name:'Ibovespa',market:'br',exchange:'B3',currency:'BRL'},
 ];
-const MARKETS: {id:Market;title:string;en:string}[]=[{id:'crypto',title:'加密货币',en:'CRYPTO'},{id:'us',title:'美股',en:'US EQUITIES'},{id:'cn',title:'A股',en:'CHINA A'}];
+const MARKETS: {id:Market;title:string;en:string}[]=[{id:'crypto',title:'加密货币',en:'CRYPTO'},{id:'us',title:'美股',en:'US EQUITIES'},{id:'cn',title:'A股',en:'CHINA A'},{id:'br',title:'巴西B3',en:'BRAZIL B3'}];
 const INTERVALS:Interval[]=['1m','5m','15m','30m','1h','4h','1d','1w','1M'];
 const TIME_LABEL:Record<Interval,string>={'1m':'1分','5m':'5分','15m':'15分','30m':'30分','1h':'1小时','4h':'4小时','1d':'日线','1w':'周线','1M':'月线'};
 const initialLayers:Layers={strokes:true,segments:true,centers:true,signals:true,scenarios:false,fractals:false,setups:true};
@@ -184,7 +189,7 @@ function HomeContent(){
       const parsed=parseCSV(text);
       chartFeed.cancel();
       const symbol=file.name.replace(/\.csv$/i,'').slice(0,40)||'CSV';
-      const ins:Instrument={id:`${market}:csv-${symbol}`,symbol,name:'本地导入数据',market,exchange:'CSV',currency:market==='cn'?'CNY':'USD'};
+      const ins:Instrument={id:`${market}:csv-${symbol}`,symbol,name:'本地导入数据',market,exchange:'CSV',currency:market==='cn'?'CNY':market==='br'?'BRL':'USD'};
       const data:MarketData={instrument:ins,interval,candles:parsed,source:`本地CSV · ${file.name}`,asOf:new Date().toISOString(),delayNotice:'用户提供的历史数据；保留closed状态，缺少closed列时按已完成处理。',adjustment:'由CSV原始数据决定',warnings:['导入数据未与交易所校验；请确认时区、复权口径和所选周期。'],availableIntervals:[interval]};
       setImported(true);setSelected(ins);setSnapshot({data,receivedAt:Date.now(),higher:{interval:higherInterval(market,interval),status:'imported'}});
       setReplay(null);setPlaying(false);setLoading(false);setFeedError(null);
@@ -207,9 +212,6 @@ function HomeContent(){
           <span className="official-x" aria-hidden="true">𝕏</span>
           <span>{t(`开发者（${WORKBENCH_BRAND.developer}）`,`Developer (${WORKBENCH_BRAND.developer})`)}</span>
         </a>
-        <a href={WORKBENCH_BRAND.originalUrl} target="_blank" rel="noopener noreferrer" title={t('原版项目源码','Original project source')}>
-          <span>{WORKBENCH_BRAND.original[language]}</span>
-        </a>
         <a href={WORKBENCH_BRAND.communityUrl} target="_blank" rel="noopener noreferrer" title={t('在 Telegram 打开社区','Open the community on Telegram')}>
           <Send size={16} aria-hidden="true"/>
           <span>{t('社区交流','Community')}</span>
@@ -219,11 +221,11 @@ function HomeContent(){
     </header>
     <aside className="sidebar">
       <div className="sidebar-heading"><span>{t("市场导航","Markets")}</span><Globe2 size={14}/></div>
-      <div className="market-menu">{MARKETS.map(m=><button key={m.id} className={market===m.id?'active':''} onClick={()=>switchMarket(m.id)}><span className="market-icon">{m.id==='crypto'?'₿':m.id==='us'?'$':'A'}</span><span>{t(m.title,m.en)}<small>{m.en}</small></span>{market===m.id&&<span className="active-marker"/>}</button>)}</div>
+      <div className="market-menu">{MARKETS.map(m=><button key={m.id} className={market===m.id?'active':''} onClick={()=>switchMarket(m.id)}><span className="market-icon">{m.id==='crypto'?'₿':m.id==='us'?'$':m.id==='br'?'R$':'A'}</span><span>{t(m.title,m.en)}<small>{m.en}</small></span>{market===m.id&&<span className="active-marker"/>}</button>)}</div>
       <div className="sidebar-tabs"><button className={watchTab==='all'?'active':''} onClick={()=>setWatchTab('all')}>{t("常用标的","Popular")}</button><button className={watchTab==='favorites'?'active':''} onClick={()=>setWatchTab('favorites')}>{t("我的自选 ","Watchlist ")}<span>{watchlist.length}</span></button></div>
       <div className="watch-list">{watchRows.map(i=><div className={`watch-row ${selected.id===i.id?'selected':''}`} key={i.id}><button onClick={()=>choose(i)}><span className={`asset-symbol ${i.market}`}>{i.symbol==='BTCUSDT'?'₿':i.symbol==='ETHUSDT'?'Ξ':i.symbol.slice(0,1)}</span><span><b>{displaySymbol(i.symbol)}</b><small>{instrumentName(i.name)}</small></span></button><button className="watch-star" onClick={()=>star(i)} title={watchlist.some(w=>w.id===i.id)?t('移出自选','Remove from watchlist'):t('加入自选','Add to watchlist')} aria-label={`${watchlist.some(w=>w.id===i.id)?t('移出自选','Remove from watchlist'):t('加入自选','Add to watchlist')} ${i.symbol}`}><Star size={12} fill={watchlist.some(w=>w.id===i.id)?'currentColor':'none'}/></button></div>)}{!watchRows.length&&<p className="empty-watch">{t("搜索标的后点星号，建立你的观察列表。","Search for an instrument and star it to build your watchlist.")}</p>}</div>
       <button className="add-symbol" onClick={()=>setSearchOpen(true)}><Search size={14}/>{t('搜索更多标的','Find instruments')} <span>/</span></button>
-      <div className="sidebar-bottom"><span className="eyebrow">OBSERVE. DEFINE. ACT.</span><p>{t('让每一次判断','Every decision,')}<br/>{t('都有结构可循。','grounded in structure.')}</p><span className="version">{t("研究终端 · v1.3","Research terminal · v1.3")}</span></div>
+      <div className="sidebar-bottom"><span className="eyebrow">OBSERVE. DEFINE. ACT.</span><p>{t('让每一次判断','Every decision,')}<br/>{t('都有结构可循。','grounded in structure.')}</p><span className="version">{t("研究终端 · v1.3","Research terminal · v1.3")}</span><a className="original-credit" href={WORKBENCH_BRAND.originalUrl} target="_blank" rel="noopener noreferrer" title={t('原版项目源码','Original project source')}>{t('基于原版项目 Trend Workbench','Based on the original Trend Workbench')}</a></div>
     </aside>
     <main className="workspace">
       <div className="page-heading"><div><div className="eyebrow">MARKET INTELLIGENCE <span>/ {MARKETS.find(m=>m.id===market)?.en}</span></div><h1>{t('洞察结构，跟随走势','Read structure. Follow price')}<span className="heading-dot">.</span></h1></div><button className="global-search" aria-label={t('搜索标的','Search instruments')} onClick={()=>setSearchOpen(true)}><Search size={16}/><span>{t("搜索代码、币种或公司名称","Search symbol, crypto or company")}</span><kbd>/</kbd></button></div>
@@ -241,7 +243,7 @@ function HomeContent(){
           {(data||!error)&&<>
           <TerminalChart key={`${selected.id}-${interval}-${imported}`} candles={candles} analysis={analysis} layers={layers} symbol={selected.symbol} interval={interval} loading={loading&&!data} forecast={rawForecast??undefined} dataFresh={displayForecast} strokeCenters={strokeCenters} centerLayer={centerLayer}/>
           <div className="replay-toolbar"><span><RotateCcw size={13}/>{replay===null?t('历史回放','Replay'):t('正在回放','Replaying')}</span><button aria-label={t("回退一根K线","Previous bar")} disabled={!data} onClick={()=>{setPlaying(false);setReplay(Math.max(Math.min(3,data!.candles.length),(replay??data!.candles.length)-1));}}><StepBack size={14}/></button><button className={playing?'active':''} aria-label={playing?t('暂停回放','Pause replay'):t('播放历史','Play history')} disabled={!data} onClick={()=>{if(replay===null)setReplay(Math.min(80,data!.candles.length-1));setPlaying(p=>!p);}}>{playing?<Pause size={14}/>:<Play size={14}/>}</button><button aria-label={t("前进一根K线","Next bar")} disabled={!data||replay===null} onClick={()=>setReplay(r=>r!==null&&r+1<data!.candles.length?r+1:null)}><StepForward size={14}/></button><input aria-label={t("历史回放进度","Replay position")} type="range" min={Math.min(3,data?.candles.length||3)} max={data?.candles.length||35} value={replay??data?.candles.length??35} disabled={!data} onChange={e=>{setPlaying(false);const n=Number(e.target.value);setReplay(n===data!.candles.length?null:n);}}/><span className="replay-counter">{candles.length} / {data?.candles.length||0}</span><button className="return-live" disabled={replay===null} onClick={()=>{setReplay(null);setPlaying(false);}}>{t("回到最新","Latest")}</button></div>
-          <div className="data-source"><span><Radio size={11}/>{data?mt(data.source):t('等待行情源','Waiting for data')} · {data?mt(data.adjustment):'—'}{replay!==null&&<b> · {t('历史回放','Replay')}</b>}</span>{data&&!imported&&interval==='4h'&&market!=='crypto'&&<span>{market==='cn'?t('4H：每交易日一根','4H: one candle per trading day'):t('4H：首段4小时，尾段2.5小时','4H: first bar 4 hours; closing bar 2.5 hours')}</span>}<span>{candles.length?`${readableTime(candles[0].time,locale)} — ${readableTime(last!.time,locale)}`:t('数据时间 —','Data time —')}</span></div>
+          <div className="data-source"><span><Radio size={11}/>{data?mt(data.source):t('等待行情源','Waiting for data')} · {data?mt(data.adjustment):'—'}{replay!==null&&<b> · {t('历史回放','Replay')}</b>}</span>{data&&!imported&&interval==='4h'&&market!=='crypto'&&<span>{market==='cn'?t('4H：每交易日一根','4H: one candle per trading day'):market==='br'?t('4H：10:00–14:00，14:00–收盘','4H: 10:00–14:00, then 14:00–close'):t('4H：首段4小时，尾段2.5小时','4H: first bar 4 hours; closing bar 2.5 hours')}</span>}<span>{candles.length?`${readableTime(candles[0].time,locale)} — ${readableTime(last!.time,locale)}`:t('数据时间 —','Data time —')}</span></div>
           <HistoryCoverage data={data}/>
           </>}
         </section>

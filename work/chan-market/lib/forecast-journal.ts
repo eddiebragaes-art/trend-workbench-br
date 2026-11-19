@@ -1,3 +1,4 @@
+// Modificado para trend-workbench-br: mercado brasileiro (B3).
 import type { Candle, MarketData } from './market-types.ts';
 import type { MarketForecast, ReadyForecastSide } from './forecast-types.ts';
 import { candleAvailableAt, exchangeClock } from './timeframe-context.ts';
@@ -22,8 +23,8 @@ export function forecastIdentity(data:Pick<MarketData,'instrument'|'interval'|'s
   return [data.instrument.market,data.instrument.symbol,data.interval,data.source,data.adjustment].join('|');
 }
 const validBar=(b:Candle)=>[b.time,b.open,b.high,b.low,b.close].every(Number.isFinite)&&b.time>0&&b.low>0&&b.high>=Math.max(b.open,b.close)&&b.low<=Math.min(b.open,b.close);
-function localStart(date:string,market:'cn'|'us'):number {
-  const wall=Date.parse(`${date}T00:00:00Z`)/1000+570*60;
+function localStart(date:string,market:'cn'|'us'|'br'):number {
+  const wall=Date.parse(`${date}T00:00:00Z`)/1000+(market==='br'?600:570)*60;
   let guess=wall;
   for(let i=0;i<3;i++){const c=exchangeClock(guess,market);guess+=wall-(Date.parse(`${c.date}T00:00:00Z`)/1000+c.minute*60);}
   return guess;

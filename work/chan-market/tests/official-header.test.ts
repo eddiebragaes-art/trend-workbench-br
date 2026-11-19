@@ -42,6 +42,7 @@ async function renderHeader(language: 'pt' | 'en') {
   assert.doesNotMatch(html, /\b(?:binance|okx)\b|币安|欧易/i);
   const header = html.match(/<header\b[^>]*>([\s\S]*?)<\/header>/)?.[1];
   assert.ok(header, 'The workbench header is missing.');
+  assert.match(html, /href="https:\/\/github\.com\/nhovongoc0-max\/trend-workbench"/, 'The credit link to the original project is missing.');
   return Array.from(header.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/g), ([, attrs, contents]) => ({
     href: attrs.match(/\shref="([^"]*)"/)?.[1],
     text: contents.replace(/<(\w+)\b[^>]*\saria-hidden="true"[^>]*>[\s\S]*?<\/\1>/g, '')
@@ -54,8 +55,7 @@ for (const language of ['pt', 'en'] as const) {
     const anchors = await renderHeader(language);
     const required = [
       ['/', language === 'pt' ? 'Estação de Tendências' : 'Trend Station'],
-      ['https://github.com/nhovongoc0-max/trend-workbench', 'Trend Workbench (original)'],
-      ['https://x.com/bi_9527zx', language === 'pt' ? 'Projeto original (DeFi狙击手)' : 'Developer (DeFi狙击手)'],
+      ['https://x.com/bi_9527zx', language === 'pt' ? 'DeFi狙击手' : 'Developer (DeFi狙击手)'],
       ['https://t.me/jujishou9527', language === 'pt' ? 'Comunidade' : 'Community'],
     ];
     for (const [href, text] of required) {

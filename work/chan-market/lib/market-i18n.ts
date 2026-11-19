@@ -125,6 +125,7 @@ const phrases: [string,string][] = [
   ['代码查询','Code lookup'],
   ['暂不可用','is unavailable'],
   ['加密货币','Cryptocurrency'],
+  ['巴西B3','B3 Brazil'],
   ['美股','US equities'],
   ['A股','China A-shares'],
   ['上交所','Shanghai Stock Exchange'],
@@ -229,5 +230,11 @@ const pt = (language: Language, value: string) => language === 'pt' ? marketText
 export const marketVenueSuffix = (venue: string | undefined, language: Language): string => pt(language, marketVenueSuffixEn(venue, asEn(language)));
 export const marketDisplayText = (text: string, language: Language): string => pt(language, marketDisplayTextEn(text, asEn(language)));
 export const marketLoadErrorText = (message: string, language: Language): string => pt(language, marketLoadErrorTextEn(message, asEn(language)));
-export const translateInstrumentName = (name: string, language: Language): string => translateInstrumentNameEn(name, asEn(language));
+export const translateInstrumentName = (name: string, language: Language): string => {
+  const value = translateInstrumentNameEn(name, asEn(language));
+  if (language === 'zh') return value;
+  // Bilingual preset names such as "NVIDIA 英伟达": keep the Latin part when there is one.
+  const latin = value.replace(/[\u3400-\u9fff]+/g, '').replace(/\s+/g, ' ').trim();
+  return /[A-Za-z]/.test(latin) ? latin : value;
+};
 export const translateMarketText = (text: string, language: Language): string => pt(language, translateMarketTextEn(text, asEn(language)));

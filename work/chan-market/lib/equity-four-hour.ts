@@ -1,4 +1,6 @@
+// Modificado para trend-workbench-br: agregação de 4 horas da B3.
 import type { Candle } from './market-types';
+import { B3_OPEN_MINUTE, B3_ZONE, b3CloseMinute } from './b3-session.ts';
 
 export interface EquityFourHourOptions {
   market: 'cn' | 'us';
@@ -85,6 +87,57 @@ export function aggregateEquityFourHour(rows: Candle[], options: EquityFourHourO
         close: values[values.length - 1].close,
         volume: values.reduce((sum, row) => sum + row.volume, 0),
         closed,
+      });
+    }
+  }
+  return { candles, discardedBuckets, excludedRows };
+}
+
+const b3Clock = new Intl.DateTimeFormat('en-CA', { timeZone: B3_ZONE, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23', weekday: 'short' });
+const B3_SPLIT_MINUTE = 14 * 60;
+
+/** B3 4-hour candles from start-stamped 1-hour bars: 10:00–14:00 and
+ * 14:00–close (17:00 or 18:00). A bucket must contain every hourly slot, in
+ * order; incomplete historical buckets are skipped, never filled. */
+export function aggregateB3FourHour(rows: Candle[], now = Date.now() / 1000): EquityFourHourResult {
+  const days = new Map<string, { midnight: number; close: number; buckets: [Map<number, Candle>, Map<number, Candle>] }>();
+  let excludedRows = 0, discardedBuckets = 0;
+  const parts = (time: number) => {
+    const p = Object.fromEntries(b3Clock.formatToParts(new Date(time * 1000)).map(x => [x.type, x.value]));
+    return { date: `${p.year}-${p.month}-${p.day}`, minute: Number(p.hour) * 60 + Number(p.minute), second: Number(p.second), weekday: p.weekday };
+  };
+  const today = parts(now).date;
+  const unique = [...new Map(rows.map(row => [row.time, row])).values()].sort((a, b) => a.time - b.time);
+  for (const row of unique) {
+    if (![row.time, row.open, row.high, row.low, row.close, row.volume].every(Number.isFinite) || row.low <= 0 || row.high < Math.max(row.open, row.close) || row.low > Math.min(row.open, row.close)) { excludedRows++; continue; }
+    const clock = parts(row.time), close = b3CloseMinute(row.time);
+    if (clock.second !== 0 || ['Sat', 'Sun'].includes(clock.weekday) || clock.minute < B3_OPEN_MINUTE || clock.minute >= close || (clock.minute - B3_OPEN_MINUTE) % 60 !== 0 || row.time > now) { excludedRows++; continue; }
+    let day = days.get(clock.date);
+    if (!day) { day = { midnight: row.time - clock.minute * 60, close, buckets: [new Map(), new Map()] }; days.set(clock.date, day); }
+    const bucket = clock.minute < B3_SPLIT_MINUTE ? 0 : 1;
+    day.buckets[bucket].set((clock.minute - (bucket ? B3_SPLIT_MINUTE : B3_OPEN_MINUTE)) / 60, row);
+  }
+  const candles: Candle[] = [];
+  for (const [date, day] of days) {
+    const windows = [[B3_OPEN_MINUTE, B3_SPLIT_MINUTE], [B3_SPLIT_MINUTE, day.close]];
+    for (let bucket = 0; bucket < 2; bucket++) {
+      const source = day.buckets[bucket];
+      if (!source.size) continue;
+      const entries = [...source.entries()].sort(([a], [b]) => a - b);
+      const expected = (windows[bucket][1] - windows[bucket][0]) / 60;
+      const prefix = entries.every(([index], i) => index === i);
+      const complete = prefix && entries.length === expected;
+      if (!prefix || (!complete && date !== today)) { discardedBuckets++; continue; }
+      const values = entries.map(([, row]) => row);
+      const end = day.midnight + windows[bucket][1] * 60;
+      candles.push({
+        time: day.midnight + windows[bucket][0] * 60,
+        open: values[0].open,
+        high: Math.max(...values.map(row => row.high)),
+        low: Math.min(...values.map(row => row.low)),
+        close: values[values.length - 1].close,
+        volume: values.reduce((sum, row) => sum + row.volume, 0),
+        closed: complete && values.every(row => row.closed === true) && now >= end + 900,
       });
     }
   }

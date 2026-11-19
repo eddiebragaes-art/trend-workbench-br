@@ -431,8 +431,23 @@ const exact: Record<string, string> = {
   'Market bars are stale': 'Velas de mercado desatualizadas',
   'Delayed market data': 'Dados de mercado com atraso',
   // Market names and identity.
+  "The current day/week/month is not covered. A holiday, closure or closed-history-only feed may explain the gap; new signals are paused.": "O dia/semana/mês atual não está coberto. Pode ser feriado, bolsa fechada ou fonte só com histórico fechado; novos sinais estão pausados.",
+  "The latest candle does not cover the current calendar period; new signals are paused.": "A última vela não cobre o período atual do calendário; novos sinais estão pausados.",
+  "The latest fetch failed. New signals are paused until a successful, current response arrives.": "A última busca falhou. Novos sinais ficam pausados até chegar uma resposta atual e bem-sucedida.",
+  "The provider exposes bar timestamps, not a verified last-trade timestamp.": "A fonte informa o horário das velas, não um horário verificado do último negócio.",
+  "The provider exposes bar timestamps, not a verified last-trade timestamp. The current calendar period is covered; this does not verify every price update within it.": "A fonte informa o horário das velas, não um horário verificado do último negócio. O período atual do calendário está coberto; isso não verifica cada atualização de preço dentro dele.",
+  "The provider exposes bar timestamps, not a verified last-trade timestamp. The latest bar is behind its interval and conservative delay allowance; new signals are paused.": "A fonte informa o horário das velas, não um horário verificado do último negócio. A última vela está atrasada além do período e da margem de atraso conservadora; novos sinais estão pausados.",
+  "The provider exposes bar timestamps, not a verified last-trade timestamp. The lag is within this tool's conservative allowance, not a provider latency guarantee.": "A fonte informa o horário das velas, não um horário verificado do último negócio. O atraso está dentro da margem conservadora desta ferramenta, não é uma garantia de latência da fonte.",
+  "The provider exposes bar timestamps, not a verified last-trade timestamp. Fetch age and bar coverage pass the checks; tick-level real-time delivery is not claimed.": "A fonte informa o horário das velas, não um horário verificado do último negócio. A idade da busca e a cobertura das velas passaram nas verificações; não se afirma tempo real tick a tick.",
+  "Original project": "Projeto original",
+  "Based on the original Trend Workbench": "Baseado no projeto original Trend Workbench",
+  "Day": "Dia",
+  "Week": "Semana",
+  "Month": "Mês",
   'Trend Workbench': 'Estação de Tendências',
   'Brazil (B3)': 'Brasil (B3)',
+  'CRYPTO': 'CRIPTO', 'US EQUITIES': 'AÇÕES EUA', 'CHINA A': 'AÇÕES CHINA', 'BRAZIL B3': 'B3 BRASIL',
+  '4H: 10:00–14:00, then 14:00–close': '4H: 10:00–14:00 e 14:00–fechamento',
   'B3 equities': 'Ações B3',
   // Analysis labels shared with the engine.
   'Bullish structure': 'Estrutura altista',
@@ -447,7 +462,7 @@ const exact: Record<string, string> = {
 
 const patterns: [RegExp, string][] = [
   [/^Imported (.+) bars$/, 'Importadas $1 velas'],
-  [/^Developer \((.+)\)$/, 'Projeto original ($1)'],
+  [/^Developer \((.+)\)$/, '$1'],
   [/^Showing candles fetched at (.+)\. New signals are paused\.$/, 'Mostrando velas obtidas em $1. Novos sinais estão pausados.'],
   [/^Next (\d+) bars after similar structures$/, 'Próximas $1 velas depois de estruturas semelhantes'],
   [/^(\d+) candles · (\d+) folds$/, '$1 velas · $2 blocos de validação'],
@@ -456,6 +471,7 @@ const patterns: [RegExp, string][] = [
   [/^Interval (\S+); monitoring the first (\d+) saved symbols \(maximum 12\)\. Alerts cover new changes only\. Closing the window stops monitoring\.$/, 'Período $1; monitorando os primeiros $2 favoritos (máximo 12). Os alertas cobrem só mudanças novas. Fechar a janela para o monitoramento.'],
   [/^The latest 600 records are retained; (\d+) older records have rolled off\. Statistics cover retained records only\.$/, 'Os 600 registros mais recentes ficam guardados; $1 registros antigos foram descartados. As estatísticas cobrem só os registros guardados.'],
   [/^Take profit (\d+)$/, 'Alvo $1'],
+  [/^Outside regular exchange-local hours \(weekend, pre\/post-market or lunch\)\. Latest bar date: (\S+)\. History is retained; closed-market gaps do not trigger feed-stale alerts or new entries\. Holidays are not verified\.$/, 'Fora do horário regular da bolsa (fim de semana, pré/pós-mercado ou almoço). Data da última vela: $1. O histórico é mantido; bolsa fechada não gera alerta de fonte parada nem novas entradas. Feriados não são verificados.'],
 ];
 
 /** Translate one English UI string to Portuguese, preserving surrounding spaces. */
@@ -525,11 +541,29 @@ const marketPhrases: [string, string][] = ([
   ['Enter a US ticker, for example AAPL or BRK-B.', 'Digite um código dos EUA, por exemplo AAPL ou BRK-B.'],
   ['Enter a valid spot pair, for example BTCUSDT.', 'Digite um par à vista válido, por exemplo BTCUSDT.'],
   ['Enter a spot pair, for example BTCUSDT.', 'Digite um par à vista, por exemplo BTCUSDT.'],
+  ['Enter a B3 ticker, for example PETR4, VALE3 or BOVA11.', 'Digite um código da B3, por exemplo PETR4, VALE3 ou BOVA11.'],
+  ['This B3 ticker was not found, or this interval has no data.', 'Código da B3 não encontrado, ou este período não tem dados.'],
+  ['This B3 ticker was not found.', 'Código da B3 não encontrado.'],
+  ['This ticker does not belong to B3. Select another symbol.', 'Este código não é da B3. Escolha outro ativo.'],
+  ['Yahoo Finance is rate limiting requests; B3 data is temporarily unavailable. Please retry in a few minutes.', 'O Yahoo Finance está limitando as consultas; os dados da B3 estão indisponíveis no momento. Tente de novo em alguns minutos.'],
+  ['B3 4-hour candles: 10:00–14:00 and 14:00–close (São Paulo time), one pair per trading day; incomplete historical buckets are skipped.', 'Velas de 4 horas da B3: 10:00–14:00 e 14:00–fechamento (horário de Brasília), um par por pregão; blocos históricos incompletos são ignorados.'],
+  ['B3 regular session only (10:00 to 17:00 or 18:00 São Paulo time, following the US clock change); auction and after-market trades are excluded. Recent candles are confirmed after a 15-minute delay.', 'Só o pregão regular da B3 (10:00 às 17:00 ou 18:00, horário de Brasília, conforme o horário de verão dos EUA); leilões e after-market ficam de fora. As velas recentes são confirmadas com 15 minutos de atraso.'],
+  ['Exchange holidays are not modelled; public Yahoo data may be delayed or rate limited.', 'Feriados da bolsa não são considerados; os dados públicos do Yahoo podem ter atraso ou limite de consultas.'],
+  ['Monthly candles follow São Paulo calendar months. The current month is marked closed only after the next month begins.', 'As velas mensais seguem os meses do calendário de Brasília. O mês atual só é marcado como fechado quando o próximo começa.'],
+  ['Appended intraday quotes and duplicate periods were removed.', 'Cotações intradiárias anexadas e períodos duplicados foram removidos.'],
+  ['America/Sao_Paulo regular session', 'pregão regular de Brasília'],
+  ['B3 Brazil', 'B3 Brasil'],
 ] as [string, string][]).sort((a, b) => b[0].length - a[0].length);
 
 export function marketTextPt(en: string): string {
   if (!en) return en;
   let value = en;
   for (const [from, to] of marketPhrases) value = value.split(from).join(to);
+  value = value
+    .replace(/Skipped (\d+) historical or gapped intervals with incomplete coverage\./g, '$1 intervalos históricos incompletos ou com falhas foram ignorados.')
+    .replace(/Only (\d+) valid 4-hour candles are available within the provider's intraday history window; the statistical sample may be insufficient\./g, 'Há só $1 velas válidas de 4 horas dentro da janela de histórico intradiário da fonte; a amostra estatística pode ser insuficiente.')
+    .replace(/Only (\d+) valid candles are available for this interval; the statistical sample may be insufficient\./g, 'Há só $1 velas válidas neste período; a amostra estatística pode ser insuficiente.')
+    .replace(/Only (\d+) candles were returned; structure and statistical samples may be insufficient\./g, 'Vieram só $1 velas; a estrutura e as amostras estatísticas podem ser insuficientes.')
+    .replace(/The provider returned only (\d+) candles; the historical sample may be insufficient\./g, 'A fonte retornou só $1 velas; a amostra histórica pode ser insuficiente.');
   return value;
 }

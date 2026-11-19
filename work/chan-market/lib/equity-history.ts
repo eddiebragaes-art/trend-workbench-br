@@ -1,3 +1,4 @@
+// Modificado para trend-workbench-br: mercado brasileiro (B3).
 import type { Candle, MarketData } from './market-types';
 import { candleAvailableAt } from './timeframe-context.ts';
 
@@ -23,7 +24,7 @@ function coveredThrough(data:MarketData):number {
 export function chooseEquityHistory(candidates:MarketData[]):MarketData|undefined {
   const first=candidates[0];
   if(!first)return undefined;
-  if(!['cn','us'].includes(first.instrument.market))throw new Error('Equity history selection requires a stock market.');
+  if(!['cn','us','br'].includes(first.instrument.market))throw new Error('Equity history selection requires a stock market.');
   const identity=(data:MarketData)=>`${data.instrument.market}:${data.instrument.symbol.toUpperCase()}:${data.interval}`;
   const expected=identity(first);
   for(const candidate of candidates)if(identity(candidate)!==expected)throw new Error('Equity history candidates must share market, symbol and interval.');

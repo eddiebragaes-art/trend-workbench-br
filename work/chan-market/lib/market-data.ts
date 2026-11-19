@@ -1,9 +1,12 @@
+// Modificado para trend-workbench-br: mercado brasileiro (B3) via Yahoo Finance.
 import type { Candle, Instrument, Interval, Market, MarketData } from './market-types';
 import { getCryptoCandles, searchCrypto, CryptoDataError } from './crypto-sources.ts';
 export { resetMarketNetworkFailures } from './crypto-sources.ts';
 import { aggregateEquityFourHour } from './equity-four-hour.ts';
 import { chooseEquityHistory } from './equity-history.ts';
 import { withHistoryCoverage } from './history-coverage.ts';
+import { aggregateB3FourHour } from './equity-four-hour.ts';
+import { B3_OPEN_MINUTE, B3_ZONE, b3CloseMinute, b3YahooSymbol } from './b3-session.ts';
 
 /** Public market-data adapters. No credentials, no trading and no synthetic prices. */
 export class MarketError extends Error {
@@ -16,6 +19,7 @@ export const AVAILABLE_INTERVALS: Record<Market, Interval[]> = {
   crypto: ALL_INTERVALS,
   us: ALL_INTERVALS,
   cn: ALL_INTERVALS,
+  br: ALL_INTERVALS,
 };
 const MINUTES: Record<Exclude<Interval, '1M'>, number> = { '1m': 1, '5m': 5, '15m': 15, '30m': 30, '1h': 60, '4h': 240, '1d': 1440, '1w': 10080 };
 const isCalendarBar = (interval: Interval) => ['1d', '1w', '1M'].includes(interval);
@@ -59,6 +63,7 @@ const popularRows: Record<Market, [string, string, string, string][]> = {
   crypto: [['BTCUSDT','比特币 Bitcoin','Binance','USDT'],['ETHUSDT','以太坊 Ethereum','Binance','USDT'],['SOLUSDT','Solana','Binance','USDT'],['BNBUSDT','BNB','Binance','USDT'],['XRPUSDT','XRP','Binance','USDT'],['DOGEUSDT','Dogecoin','Binance','USDT'],['ADAUSDT','Cardano','Binance','USDT'],['AVAXUSDT','Avalanche','Binance','USDT'],['LINKUSDT','Chainlink','Binance','USDT'],['SUIUSDT','Sui','Binance','USDT'],['LTCUSDT','Litecoin','Binance','USDT'],['DOTUSDT','Polkadot','Binance','USDT']],
   us: [['AAPL','苹果 Apple','NASDAQ','USD'],['MSFT','微软 Microsoft','NASDAQ','USD'],['NVDA','英伟达 NVIDIA','NASDAQ','USD'],['TSLA','特斯拉 Tesla','NASDAQ','USD'],['AMZN','亚马逊 Amazon','NASDAQ','USD'],['GOOGL','谷歌 Alphabet','NASDAQ','USD'],['META','Meta Platforms','NASDAQ','USD'],['AMD','AMD','NASDAQ','USD'],['COIN','Coinbase','NASDAQ','USD'],['MSTR','Strategy','NASDAQ','USD'],['SPY','标普500 ETF','NYSE Arca','USD'],['QQQ','纳斯达克100 ETF','NASDAQ','USD']],
   cn: [['600519.SH','贵州茅台 guizhoumaotai gzmt','上交所','CNY'],['300750.SZ','宁德时代 ningdeshidai ndsd','深交所','CNY'],['002594.SZ','比亚迪 biyadi byd','深交所','CNY'],['000001.SZ','平安银行 pinganyinhang payh','深交所','CNY'],['600036.SH','招商银行 zhaoshangyinhang zsyh','上交所','CNY'],['601318.SH','中国平安 zhongguopingan zgpa','上交所','CNY'],['600900.SH','长江电力 changjiangdianli cjdl','上交所','CNY'],['000858.SZ','五粮液 wuliangye wly','深交所','CNY'],['000333.SZ','美的集团 meidijituan mdjt','深交所','CNY'],['688981.SH','中芯国际 zhongxinguoji zxgj','上交所','CNY'],['300059.SZ','东方财富 dongfangcaifu dfcf','深交所','CNY'],['920599.BJ','同力股份 tongligufen tlgf','北交所','CNY']],
+  br: [['PETR4','Petrobras PN','B3','BRL'],['VALE3','Vale ON','B3','BRL'],['ITUB4','Itaú Unibanco PN','B3','BRL'],['BBDC4','Bradesco PN','B3','BRL'],['BBAS3','Banco do Brasil ON','B3','BRL'],['ABEV3','Ambev ON','B3','BRL'],['WEGE3','WEG ON','B3','BRL'],['B3SA3','B3 ON','B3','BRL'],['ITSA4','Itaúsa PN','B3','BRL'],['PRIO3','PRIO ON','B3','BRL'],['BOVA11','iShares Ibovespa ETF','B3','BRL'],['^BVSP','Ibovespa','B3','BRL']],
 };
 function popular(market: Market, q: string): Instrument[] {
   const key = q.toLowerCase().replace(/[\s/]/g, '');
@@ -71,13 +76,13 @@ function unique(rows: Instrument[]): Instrument[] {
 }
 export type SearchMarket = Market | 'all';
 interface SearchResult { results: Instrument[]; warning?: string }
-const SEARCH_MARKETS: Market[] = ['crypto', 'us', 'cn'];
-const MARKET_NAMES: Record<Market, string> = { crypto: '加密货币', us: '美股', cn: 'A股' };
+const SEARCH_MARKETS: Market[] = ['crypto', 'us', 'cn', 'br'];
+const MARKET_NAMES: Record<Market, string> = { crypto: '加密货币', us: '美股', cn: 'A股', br: '巴西B3' };
 export function parseSearchMarket(value: string | null): SearchMarket {
   return !value || value === 'all' ? 'all' : parseMarket(value);
 }
 export function parseMarket(value: string | null): Market {
-  if (value === 'crypto' || value === 'us' || value === 'cn') return value;
+  if (value === 'crypto' || value === 'us' || value === 'cn' || value === 'br') return value;
   throw new MarketError('请选择 crypto、us 或 cn 市场。', 400);
 }
 export function parseInterval(value: string | null, market: Market): Interval {
@@ -90,6 +95,11 @@ export function normalizeSymbol(market: Market, input: string): string {
   if (market === 'crypto') {
     const symbol = value.replace(/\//g, '');
     if (!/^[A-Z0-9]{4,30}$/.test(symbol)) throw new MarketError('请输入有效的现货交易对，例如 BTCUSDT。', 400);
+    return symbol;
+  }
+  if (market === 'br') {
+    const symbol = value.replace(/\.SA$/, '');
+    if (!/^(\^BVSP|[A-Z][A-Z0-9]{3}\d{1,2}F?)$/.test(symbol)) throw new MarketError('Enter a B3 ticker, for example PETR4, VALE3 or BOVA11.', 400);
     return symbol;
   }
   if (market === 'us') {
@@ -137,15 +147,17 @@ async function usHints(q: string) {
   return cached(`tencent-us:${q.toUpperCase()}`, 30*60000, async () => (await tencentHints(q.replace(/-/g,'.'),'us')).map(usHint).filter((x): x is NonNullable<typeof x> => !!x));
 }
 /** Calendar bars close conservatively. Monthly bars are confirmed only after local month-end. */
-export function stockBarClosed(time: number, interval: Interval, market: 'cn' | 'us', now = Date.now() / 1000, sessionEnd?: number): boolean {
+export function stockBarClosed(time: number, interval: Interval, market: 'cn' | 'us' | 'br', now = Date.now() / 1000, sessionEnd?: number): boolean {
   if (!Number.isFinite(time) || !Number.isFinite(now)) return false;
-  const zone = market === 'cn' ? 'Asia/Shanghai' : 'America/New_York';
+  const zone = market === 'cn' ? 'Asia/Shanghai' : market === 'br' ? B3_ZONE : 'America/New_York';
+  // Regular-session close in exchange-local minutes.
+  const close = market === 'cn' ? 900 : market === 'br' ? b3CloseMinute(time) : 960;
   const bar = localClock(time, zone), current = localClock(now, zone);
-  const safetySeconds = market === 'us' ? 900 : 120;
+  const safetySeconds = market === 'cn' ? 120 : 900;
   if (interval === '1M') return bar.date.slice(0, 7) < current.date.slice(0, 7);
   if (interval === '1d') {
     if (bar.date < current.date) return true;
-    const endMinute = market === 'cn' ? 15 * 60 + 2 : 16 * 60 + 15;
+    const endMinute = market === 'cn' ? 15 * 60 + 2 : close + 15;
     return bar.date === current.date && current.hour * 60 + current.minute >= endMinute;
   }
   if (interval === '1w') {
@@ -154,7 +166,7 @@ export function stockBarClosed(time: number, interval: Interval, market: 'cn' | 
     start.setUTCDate(start.getUTCDate() + daysToFriday);
     const friday = start.toISOString().slice(0,10);
     if (current.date > friday) return true;
-    return current.date === friday && current.hour * 60 + current.minute >= (market === 'cn' ? 902 : 975);
+    return current.date === friday && current.hour * 60 + current.minute >= (market === 'cn' ? 902 : close + 15);
   }
   // Eastmoney labels minute bars by END time; Yahoo labels them by START time.
   if (market === 'cn') return now >= time + safetySeconds;
@@ -162,7 +174,7 @@ export function stockBarClosed(time: number, interval: Interval, market: 'cn' | 
   let end = time + MINUTES[interval] * 60;
   if (sessionEnd && sessionEnd > time) end = Math.min(end, sessionEnd);
   else {
-    const minutesToRegularEnd = 16 * 60 - bar.hour * 60 - bar.minute;
+    const minutesToRegularEnd = close - bar.hour * 60 - bar.minute;
     if (minutesToRegularEnd > 0) end = Math.min(end, time + minutesToRegularEnd * 60);
   }
   return now >= end + safetySeconds;
@@ -240,6 +252,13 @@ async function searchSingleMarket(market: Market, query: string): Promise<Search
           return {results:unique([...rows,...local]),warning:'Yahoo搜索暂不可用，已切换腾讯美股搜索；支持范围取决于备用源收录。'};
         }
       }
+      if (market === 'br') {
+        const data = await json<YahooSearch>(`https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(q)}&quotesCount=20&newsCount=0&enableFuzzyQuery=false&region=BR&lang=pt-BR`);
+        if (!Array.isArray(data.quotes)) throw new MarketError('Online symbol search is temporarily unavailable.');
+        const rows = data.quotes.filter(x => (x.exchange === 'SAO' && /\.SA$/i.test(x.symbol) || x.symbol === '^BVSP') && ['EQUITY','ETF','INDEX','MUTUALFUND'].includes(x.quoteType))
+          .flatMap(x => { try { return [instrument('br',normalizeSymbol('br',x.symbol),x.shortname || x.longname || x.symbol,'B3','BRL')]; } catch { return []; } });
+        return { results: unique([...rows,...local]) };
+      }
       const directCode = /^(?:(SH|SZ|BJ))?\d{6}(?:\.(SH|SZ|BJ|SS))?$/i.test(q) ? normalizeSymbol('cn',q) : undefined;
       const rows = (await tencentHints(directCode ? directCode.slice(0,6) : q,'gp')).filter(x=>['sh','sz','bj'].includes(x[0]) && /^\d{6}$/.test(x[1])).map(x=>instrument('cn',`${x[1]}.${x[0].toUpperCase()}`,x[2], x[0]==='sh'?'上交所':x[0]==='bj'?'北交所':'深交所','CNY'));
       // Search by an exact code is still useful when the hint service does not index a new listing.
@@ -253,6 +272,7 @@ async function searchSingleMarket(market: Market, query: string): Promise<Search
     const results = [...local];
     try {
       if (market === 'cn' && /\d{6}/.test(q)) { const symbol = normalizeSymbol(market,q); results.push(instrument(market,symbol,`代码查询 ${symbol}`,symbol.endsWith('SH')?'上交所':symbol.endsWith('BJ')?'北交所':'深交所','CNY')); }
+      if (market === 'br' && /^[A-Za-z][A-Za-z0-9]{3}\d{1,2}$/.test(q)) { const symbol = normalizeSymbol(market,q); results.push(instrument(market,symbol,`代码查询 ${symbol}`,'B3','BRL')); }
       if (market === 'us' && /^[A-Za-z^][A-Za-z0-9.^-]{0,19}$/.test(q)) { const symbol = normalizeSymbol(market,q); results.push(instrument(market,symbol,`代码查询 ${symbol}`,'待行情源确认','USD')); }
     } catch { /* Invalid direct symbol is not exposed. */ }
     return { results: unique(results), warning: '在线搜索暂时不可用；仅显示匹配的常用标的或待行情核验的代码。' };
@@ -265,6 +285,7 @@ export async function getCandles(market: Market, rawSymbol: string, interval: In
   const limit = Math.min(1000,Math.max(100,Number.isFinite(requestedLimit)?Math.floor(requestedLimit):800));
   return cached(`candles:${market}:${symbol}:${interval}:${limit}`, 30000, async () => {
     const data = market === 'crypto' ? await cryptoCandles(symbol,interval,limit)
+      : market === 'br' ? await brCandles(symbol,interval,limit)
       : interval === '4h' ? await equityFourHourCandles(market,symbol,limit)
       : market === 'us' ? await usCandles(symbol,interval,limit)
       : await cnCandles(symbol,interval,limit);
@@ -358,7 +379,8 @@ async function selectStockHistory(candidates:(() => Promise<MarketData>)[]):Prom
   if (error instanceof MarketError) throw error;
   throw new MarketError('该标的在当前周期暂时没有可用历史行情。');
 }
-async function yahooCandles(symbol: string, interval: Interval, limit: number): Promise<MarketData> {
+async function yahooCandles(symbol: string, interval: Interval, limit: number, market: 'us' | 'br' = 'us'): Promise<MarketData> {
+  const zone = market === 'br' ? B3_ZONE : 'America/New_York', providerSymbol = market === 'br' ? b3YahooSymbol(symbol) : symbol;
   const providerInterval = interval === '1h' ? '60m' : interval === '1w' ? '1wk' : interval === '1M' ? '1mo' : interval;
   const range = interval === '1m' ? '7d' : interval === '1d' ? '5y' : interval === '1h' ? '2y' : '60d';
   // Explicit calendar bounds avoid range=max silently changing monthly bars
@@ -368,17 +390,17 @@ async function yahooCandles(symbol: string, interval: Interval, limit: number): 
   const query = `interval=${providerInterval}&${window}&includePrePost=false&events=div%2Csplits`;
   // First-party website endpoints, not an authorized exchange feed. No retry on denial/limits.
   let data: YahooChart, host = 'query1.finance.yahoo.com';
-  try { data = await json<YahooChart>(`https://${host}/v8/finance/chart/${encodeURIComponent(symbol)}?${query}`); }
+  try { data = await json<YahooChart>(`https://${host}/v8/finance/chart/${encodeURIComponent(providerSymbol)}?${query}`); }
   catch(error) {
-    if (error instanceof MarketError && error.status === 404) throw new MarketError('未找到该美股标的。',404);
+    if (error instanceof MarketError && error.status === 404) throw new MarketError(market === 'br' ? 'This B3 ticker was not found.' : '未找到该美股标的。',404);
     if (error instanceof MarketError && [403,429].includes(error.upstreamStatus || 0)) throw error;
     host = 'query2.finance.yahoo.com';
-    data = await json<YahooChart>(`https://${host}/v8/finance/chart/${encodeURIComponent(symbol)}?${query}`);
+    data = await json<YahooChart>(`https://${host}/v8/finance/chart/${encodeURIComponent(providerSymbol)}?${query}`);
   }
   const result = data?.chart?.result?.[0];
-  if (!result || data.chart?.error) throw new MarketError('未找到该美股标的或该周期暂无数据。',404);
+  if (!result || data.chart?.error) throw new MarketError(market === 'br' ? 'This B3 ticker was not found, or this interval has no data.' : '未找到该美股标的或该周期暂无数据。',404);
   const meta = result.meta || {};
-  if (meta.exchangeTimezoneName && meta.exchangeTimezoneName !== 'America/New_York') throw new MarketError('该代码不属于美股市场，请重新选择。',422);
+  if (meta.exchangeTimezoneName && meta.exchangeTimezoneName !== zone) throw new MarketError(market === 'br' ? 'This ticker does not belong to B3. Select another symbol.' : '该代码不属于美股市场，请重新选择。',422);
   validateYahooGranularity(interval,meta.dataGranularity);
   const q = result.indicators?.quote?.[0];
   if (!q || !Array.isArray(result.timestamp) || ![q.open,q.high,q.low,q.close,q.volume].every(Array.isArray)) throw new MarketError('行情源缺少完整K线。');
@@ -387,17 +409,19 @@ async function yahooCandles(symbol: string, interval: Interval, limit: number): 
   const useAdjusted = isCalendarBar(interval) && Array.isArray(adjust);
   const rows: Candle[] = result.timestamp.map((time: number,i: number) => {
     const ratio = useAdjusted && Number(q.close[i]) > 0 && Number(adjust?.[i]) > 0 ? Number(adjust?.[i])/Number(q.close[i]) : 1;
-    return {time,open:q.open[i] == null ? NaN : Number(q.open[i])*ratio,high:q.high[i] == null ? NaN : Number(q.high[i])*ratio,low:q.low[i] == null ? NaN : Number(q.low[i])*ratio,close:q.close[i] == null ? NaN : Number(q.close[i])*ratio,volume:q.volume[i] == null ? 0 : Number(q.volume[i]),closed:stockBarClosed(time,interval,'us',now,meta.currentTradingPeriod?.regular?.end)};
+    return {time,open:q.open[i] == null ? NaN : Number(q.open[i])*ratio,high:q.high[i] == null ? NaN : Number(q.high[i])*ratio,low:q.low[i] == null ? NaN : Number(q.low[i])*ratio,close:q.close[i] == null ? NaN : Number(q.close[i])*ratio,volume:q.volume[i] == null ? 0 : Number(q.volume[i]),closed:stockBarClosed(time,interval,market,now,meta.currentTradingPeriod?.regular?.end)};
   });
   // Yahoo can append a 16:00 instantaneous quote to intraday history. It is
   // not a new hourly/minute OHLC candle and must not enter structure analysis.
   const regularRows = isCalendarBar(interval) ? rows : rows.filter(c => {
     if (!Number.isFinite(c.time) || c.time % 60 !== 0) return false;
-    const clock = localClock(c.time,'America/New_York'), minute = clock.hour*60+clock.minute;
-    return clock.weekday>=1 && clock.weekday<=5 && minute>=570 && minute<960 && (minute-570)%MINUTES[interval as Exclude<Interval,'1M'>]===0;
+    const clock = localClock(c.time,zone), minute = clock.hour*60+clock.minute;
+    const open = market === 'br' ? B3_OPEN_MINUTE : 570, close = market === 'br' ? b3CloseMinute(c.time) : 960;
+    return clock.weekday>=1 && clock.weekday<=5 && minute>=open && minute<close && (minute-open)%MINUTES[interval as Exclude<Interval,'1M'>]===0;
   });
-  const prepared = interval === '1M' ? normalizeYahooMonthlyCandles(rows,meta.dataGranularity) : interval === '1w' ? normalizeYahooWeeklyCandles(rows,meta.dataGranularity) : regularRows;
+  const prepared = interval === '1M' ? normalizeYahooMonthlyCandles(rows,meta.dataGranularity,zone) : interval === '1w' ? normalizeYahooWeeklyCandles(rows,meta.dataGranularity,zone) : regularRows;
   const candles = ensure(prepared,1).slice(-limit);
+  if (market === 'br') return brYahooResult(symbol,interval,candles,rows.length!==prepared.length,meta,host,now,useAdjusted);
   const warnings = ['美股正常交易时段数据，不含盘前盘后；公开网页接口可能限流或延迟。','最近K线保守延后15分钟确认；提前收市的日/周K可能延后标为完成。'];
   if (interval === '1m') warnings.push('1分钟K线由真实分钟OHLC构成；Yahoo最多请求最近7天，页面仍受返回数量限制。');
   if (interval === '1M') warnings.push('月线按纽约自然月聚合；当前月在进入下月后才标记已收盘。');
@@ -410,27 +434,27 @@ export function validateYahooGranularity(interval:Interval,granularity:string|un
   const allowed:Record<Interval,string[]>={'1m':['1m'],'5m':['5m'],'15m':['15m'],'30m':['30m'],'1h':['60m','1h'],'4h':['4h'],'1d':['1d'],'1w':['1wk'],'1M':['1mo']};
   if(!granularity||!allowed[interval].includes(granularity))throw new MarketError(`Yahoo实际周期${granularity||'未知'}与请求的${interval}不一致，已拒绝错周期数据。`);
 }
-function usWeekKey(time:number):string {
-  const date=localClock(time,'America/New_York').date;
+function usWeekKey(time:number,zone='America/New_York'):string {
+  const date=localClock(time,zone).date;
   const d=new Date(`${date}T00:00:00Z`);d.setUTCDate(d.getUTCDate()-(d.getUTCDay()+6)%7);
   return d.toISOString().slice(0,10);
 }
-export function normalizeYahooWeeklyCandles(rows:Candle[],granularity:string|undefined):Candle[] {
+export function normalizeYahooWeeklyCandles(rows:Candle[],granularity:string|undefined,zone='America/New_York'):Candle[] {
   validateYahooGranularity('1w',granularity);
   const weeks=new Map<string,Candle>();
   for(const row of sanitizeCandles(rows)) {
-    const key=usWeekKey(row.time);
+    const key=usWeekKey(row.time,zone);
     // The genuine period bar precedes Yahoo's appended last-session quote.
     if(!weeks.has(key))weeks.set(key,row);
   }
   return [...weeks.values()];
 }
 /** Yahoo may downsample range=max to quarters and append a daily quote to period data. */
-export function normalizeYahooMonthlyCandles(rows:Candle[],granularity:string|undefined):Candle[] {
+export function normalizeYahooMonthlyCandles(rows:Candle[],granularity:string|undefined,zone='America/New_York'):Candle[] {
   if(granularity!=='1mo')throw new MarketError('Yahoo返回周期与月线不一致，未将季度数据作为月线使用。');
   const months=new Map<string,Candle>();
   for(const row of sanitizeCandles(rows)) {
-    const date=localClock(row.time,'America/New_York').date;
+    const date=localClock(row.time,zone).date;
     // Yahoo native monthly bars are stamped on the first calendar day, whereas
     // appended realtime/day quotes carry their actual trading date/time.
     if(!date.endsWith('-01'))continue;
@@ -489,6 +513,36 @@ async function usEastmoneyCandles(symbol: string, interval: Interval, limit: num
   if (interval === '1M') warnings.push('月线按纽约自然月聚合；当前月在进入下月后才标记已收盘。');
   if (candles.length<200) warnings.push(`行情源本次仅返回${candles.length}根K线，历史统计样本可能不足。`);
   return {instrument:instrument('us',symbol,result.name||metadata.name,metadata.exchange,'USD'),interval,candles,source:'东方财富 美股网页行情（备用） · push2his.eastmoney.com',asOf:new Date(now*1000).toISOString(),delayNotice:'延迟行情，非交易所直连 · America/New_York正常交易时段 · 分钟K线为周期结束',adjustment:'不复权（原始价格）；成交量单位：股',warnings,availableIntervals:AVAILABLE_INTERVALS.us};
+}
+/** B3 equities, ETFs and the Ibovespa from Yahoo Finance (ticker.SA). There is
+ * no independent fallback: a failure is reported rather than filled. */
+async function brCandles(symbol: string, interval: Interval, limit: number): Promise<MarketData> {
+  if (yahooUnavailableUntil > Date.now()) throw new MarketError('Yahoo Finance is rate limiting requests; B3 data is temporarily unavailable. Please retry in a few minutes.',503);
+  try {
+    if (interval !== '4h') return await yahooCandles(symbol,interval,limit,'br');
+    const sourceLimit = Math.min(8200, limit * 3 + 16);
+    const hourly = await yahooCandles(symbol,'1h',sourceLimit,'br');
+    const result = aggregateB3FourHour(hourly.candles);
+    const candles = ensure(result.candles,1).slice(-limit);
+    const warnings = ['B3 4-hour candles: 10:00–14:00 and 14:00–close (São Paulo time), one pair per trading day; incomplete historical buckets are skipped.'];
+    if (result.discardedBuckets) warnings.push(`已跳过${result.discardedBuckets}个覆盖不完整的历史区间或缺口区间。`);
+    if (candles.length < 200) warnings.push(`4小时有效K线仅${candles.length}根，受来源分钟历史窗口限制，统计样本可能不足。`);
+    return { ...hourly, interval: '4h', candles, source: `${hourly.source} · 1小时聚合4小时`, warnings, availableIntervals: AVAILABLE_INTERVALS.br };
+  } catch (error) {
+    if (error instanceof MarketError && [403,429].includes(error.upstreamStatus || 0)) yahooUnavailableUntil = Date.now() + 5*60000;
+    throw error;
+  }
+}
+function brYahooResult(symbol:string,interval:Interval,candles:Candle[],trimmed:boolean,meta:{longName?:string;shortName?:string},host:string,now:number,adjusted:boolean):MarketData {
+  const warnings = ['B3 regular session only (10:00 to 17:00 or 18:00 São Paulo time, following the US clock change); auction and after-market trades are excluded. Recent candles are confirmed after a 15-minute delay.','Exchange holidays are not modelled; public Yahoo data may be delayed or rate limited.'];
+  if (interval === '1M') warnings.push('Monthly candles follow São Paulo calendar months. The current month is marked closed only after the next month begins.');
+  if (trimmed && (interval === '1w' || interval === '1M')) warnings.push('Appended intraday quotes and duplicate periods were removed.');
+  if (candles.length < 200) warnings.push(`该周期仅有${candles.length}根有效K线，统计样本可能不足。`);
+  return {instrument:instrument('br',symbol,meta.longName || meta.shortName || popular('br',symbol)[0]?.name || symbol,'B3','BRL'),interval,candles,
+    source:`Yahoo Finance public feed · B3 · ${host}`,asOf:new Date(now*1000).toISOString(),
+    delayNotice:'May be delayed; not a direct exchange feed · America/Sao_Paulo regular session · Candles are start-stamped',
+    adjustment:adjusted?'按调整后收盘价等比例调整OHLC（分红、拆股），成交量未调整':'来源原始OHLC；拆股或其他公司行动可能影响历史比较',
+    warnings,availableIntervals:AVAILABLE_INTERVALS.br};
 }
 async function cnCandles(symbol: string, interval: Interval, limit: number): Promise<MarketData> {
   const fallbacks = isCalendarBar(interval) && !symbol.endsWith('.BJ') ? [cnTencentCandles,cnSinaCandles] : [cnSinaCandles,cnTencentCandles];

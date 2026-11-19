@@ -1,3 +1,5 @@
+// Modificado para trend-workbench-br: mercado brasileiro (B3).
+import { B3_OPEN_MINUTE, b3CloseMinute } from './b3-session.ts';
 import type { Interval, MarketData } from './market-types';
 import { exchangeClock } from './timeframe-context.ts';
 
@@ -52,7 +54,7 @@ export function getFeedHealth(data:MarketData|null,options:FeedHealthOptions):Fe
   if(market!=='crypto') {
     const clock=exchangeClock(nowMs/1000,market);minute=clock.minute;
     const day=new Date(`${clock.date}T00:00:00Z`).getUTCDay();
-    const open=day!==0&&day!==6&&(market==='cn'?(minute>=570&&minute<690||minute>=780&&minute<900):minute>=570&&minute<960);
+    const open=day!==0&&day!==6&&(market==='cn'?(minute>=570&&minute<690||minute>=780&&minute<900):market==='br'?minute>=B3_OPEN_MINUTE&&minute<b3CloseMinute(nowMs/1000):minute>=570&&minute<960);
     if(!open)return result('closed',market==='cn'&&day!==0&&day!==6&&minute>=690&&minute<780?'午间休市':'常规交易时段外','Outside regular trading hours',
       `按交易所当地时间处于周末、盘前盘后或午休；最近K线日期 ${lastDate}。保留历史，不把休市当停更，不发新入场提醒。节假日另需核对。`,
       `Outside regular exchange-local hours (weekend, pre/post-market or lunch). Latest bar date: ${lastDate}. History is retained; closed-market gaps do not trigger feed-stale alerts or new entries. Holidays are not verified.`);
@@ -70,7 +72,7 @@ export function getFeedHealth(data:MarketData|null,options:FeedHealthOptions):Fe
   const normalLag=intervalMs+60000,delayedLag=normalLag+(expectedDelayMs||0);
   const age=nowMs-lastBarTimeMs!;
   if(market!=='crypto'&&lastDate!==nowDate) {
-    if(minute<570+delayedLag/60000)return {...result('delayed','开盘数据衔接中','Opening-session delay',
+    if(minute<(market==='br'?B3_OPEN_MINUTE:570)+delayedLag/60000)return {...result('delayed','开盘数据衔接中','Opening-session delay',
       '仍是上一交易日K线，处于开盘容忍窗口；等待当前交易日数据前不应追报旧信号。',
       'The feed still contains the prior session during the opening grace window. Do not replay old signals while waiting for current-session bars.'),allowSignals:false};
     return result('unknown','交易日时效待核实','Trading date unverified','最近K线不属于今日；未接交易所节假日历，无法区分节假日、停牌与旧行情，暂停新信号。','The latest bar is from an earlier date. Without an exchange holiday calendar, a holiday, halt or old feed cannot be distinguished; new signals are paused.');
