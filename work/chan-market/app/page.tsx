@@ -28,6 +28,7 @@ import {buildStrokeCenters} from '@/lib/center-layers';
 import WatchMonitor from '@/components/watch-monitor';
 import ForecastActivity from '@/components/forecast-activity';
 import PaperAccountPanel from '@/components/paper-account';
+import PropLab from '@/components/prop-lab';
 import ForecastValidationPanel from '@/components/forecast-validation-panel';
 import type {Analysis,Instrument,Interval,Market,MarketData} from '@/lib/market-types';
 
@@ -267,6 +268,7 @@ function HomeContent(){
       <WatchMonitor watchlist={watchlist} interval={interval} enabled={monitorEnabled&&live} onEnabledChange={setMonitorEnabled} onSnapshot={onWatchSnapshot}/>
       <ForecastActivity journal={journal} data={data} notices={notices} saved={journalSaved}/>
       <PaperAccountPanel journal={journal}/>
+      <PropLab data={data} watchlist={watchlist} interval={interval}/>
       <ForecastValidationPanel/>
     </main>
     <input type="file" accept=".csv,text/csv" ref={fileInput} hidden onChange={e=>{const f=e.target.files?.[0];e.target.value='';if(f)void importFile(f);}}/>

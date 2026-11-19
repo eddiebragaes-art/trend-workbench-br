@@ -511,3 +511,20 @@ export function analyze(candles:Candle[], options:AnalysisOptions={}):Analysis {
   if(s.strokes.length<3)warnings.push('当前窗口有效笔不足；可增加历史范围或切换周期。');
   return {input:confluence?.input,fractals:s.fractals.map(f=>({index:f.index,time:f.time,price:f.price,type:f.type,confirmedAt:f.confirmedAt})),strokes:s.strokes,segments:s.segments,centers:s.centers,signals:s.signals.sort((a,b)=>a.index-b.index),macd:s.macd,scenarios:scenarios(bars,s),tradeSetups:tradeSetups(bars,s),tradePlans,planSession,decision,confluence,bias:s.bias,calibration,warnings,ruleVersion:`chan-experimental-1.5 · ${mode==='new'?'2007-09-18新笔':'第62课旧笔'} · 仅已收盘K线`};
 }
+
+// Adicionado em trend-workbench-br: sinais estruturais sem planos nem estatísticas (usado no backtest).
+/** level "segment" is the normal analysis; level "stroke" applies the same
+ * center, divergence and 1st/2nd point rules one level lower, on strokes. */
+export function structureSignals(candles:Candle[], level:'segment'|'stroke'='segment', mode:'new'|'old'='new'):{signals:Signal[];atr:number} {
+  const {bars}=validClosed(candles),s=core(bars,mode);
+  if(level==='stroke') {
+    const {centers,signals}=buildCenters(s.strokes);
+    const lower={...s,segments:s.strokes,centers,signals};
+    addDivergenceSignals(bars,lower);
+    addFirstSecondSignals(lower);
+    return {signals:lower.signals,atr:atr(bars)};
+  }
+  addDivergenceSignals(bars,s);
+  addFirstSecondSignals(s);
+  return {signals:s.signals,atr:atr(bars)};
+}
