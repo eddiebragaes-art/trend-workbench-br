@@ -40,7 +40,7 @@ def check_server(resources, host_node, check_feed):
             assert session.status == 200 and session.readline() == b"event: connected\n"
             health = json.loads(read_local(port, "/health"))
             assert health["pid"] == process.pid and health["activeWindows"] == 1
-            assert "趋势判断工作台" in read_local(port, "/").decode()
+            assert "Estação de Tendências" in read_local(port, "/").decode()
             script = read_local(port, "/app.js")
             assert b"https://x.com/bi_9527zx" in script and b"https://t.me/jujishou9527" in script
             assert read_local(port, "/style.css")

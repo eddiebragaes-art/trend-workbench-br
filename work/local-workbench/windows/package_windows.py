@@ -1,4 +1,6 @@
-"""Build a relocatable Windows x64 package from the shared desktop source."""
+"""Modificado para trend-workbench-br: nomes e instruções em português.
+
+Build a relocatable Windows x64 package from the shared desktop source."""
 import argparse
 import hashlib
 from pathlib import Path
@@ -8,16 +10,23 @@ import tempfile
 import zipfile
 
 HERE = Path(__file__).resolve().parent
-NAME = "趋势判断工作台"
+NAME = "Estacao de Tendencias"
+LAUNCHER = "Iniciar Estacao de Tendencias.vbs"
 NODE_SHA256 = "58e74bf02fc5bbacc41dcb8bef089961cd5bddd37830b87784e4fc624d145d1f"
-README = """趋势判断工作台 · Windows x64
+README = """Estação de Tendências (trend-workbench-br) · Windows x64
 
-在 Windows 10 或 11 上解压整个文件夹，双击「启动工作台.vbs」。
-请将目录放在可写入的位置。程序使用系统 Microsoft Edge 打开独立窗口，已包含 Node 运行环境。
-在线行情需要网络。关闭工作台窗口后，本机行情服务会退出。
+1. Extraia a pasta inteira do ZIP para um local onde você possa gravar (por exemplo, Documentos).
+2. Dê dois cliques em "Iniciar Estacao de Tendencias.vbs".
+3. A estação abre numa janela própria do Microsoft Edge. O Node já vem incluído.
 
-开发者（DeFi狙击手）  https://x.com/bi_9527zx
-社区交流  https://t.me/jujishou9527
+As cotações ao vivo precisam de internet. Ao fechar a janela, o serviço local encerra sozinho.
+Se precisar encerrar o serviço manualmente, clique com o botão direito em
+"Parar servico local.ps1" e escolha "Executar com o PowerShell".
+
+Baseado no projeto original Trend Workbench: https://github.com/nhovongoc0-max/trend-workbench
+Desenvolvedor original (DeFi狙击手)  https://x.com/bi_9527zx
+Comunidade original  https://t.me/jujishou9527
+Versão modificada: https://github.com/eddiebragaes-art/trend-workbench-br
 """
 
 
@@ -33,12 +42,12 @@ def main():
     with tempfile.TemporaryDirectory(prefix="Trend-Workbench-Windows-") as tmp:
         root = Path(tmp) / NAME
         subprocess.run(["node", str(HERE.parent / "build.mjs"), "--shared-assets", str(root)], check=True)
-        for file in ("launcher.ps1", "启动工作台.vbs", "停止本机服务.ps1"):
+        for file in ("launcher.ps1", LAUNCHER, "Parar servico local.ps1"):
             shutil.copyfile(HERE / file, root / file)
         (root / "runtime").mkdir()
         shutil.copyfile(runtime, root / "runtime/node.exe")
-        shutil.copyfile(HERE.parent / "assets/workbench.ico", root / "工作台.ico")
-        (root / "使用说明.txt").write_text(README, encoding="utf-8-sig")
+        shutil.copyfile(HERE.parent / "assets/workbench.ico", root / "Estacao de Tendencias.ico")
+        (root / "LEIA-ME.txt").write_text(README, encoding="utf-8-sig")
         licenses = root / "Licenses"
         licenses.mkdir()
         for document in ("LICENSE", "NOTICE"):

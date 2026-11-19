@@ -9,7 +9,7 @@ import zipfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from verify_service import check_server
-from package_windows import NAME, NODE_SHA256
+from package_windows import LAUNCHER, NAME, NODE_SHA256
 
 
 def main():
@@ -28,7 +28,7 @@ def main():
         node = package / "runtime/node.exe"
         with node.open("rb") as stream:
             assert hashlib.file_digest(stream, "sha256").hexdigest() == NODE_SHA256
-        assert (package / "启动工作台.vbs").is_file()
+        assert (package / LAUNCHER).is_file()
         version = subprocess.check_output([node, "-p", "process.platform+' '+process.arch+' '+process.version"], text=True)
         assert version.strip() == "win32 x64 v24.14.1"
         subprocess.run(["powershell.exe", "-NoProfile", "-File", str(package / "launcher.ps1"), "-CheckOnly", "-NoWindow"], check=True)
