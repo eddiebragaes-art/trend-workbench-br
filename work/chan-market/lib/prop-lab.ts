@@ -3,8 +3,8 @@
 //    on every prefix and a trade starts at the close of the bar where a signal
 //    first appears. 2) Monte Carlo of a prop-firm evaluation using the backtest
 //    R outcomes. 3) Grid search for the risk/rule/setup with the best EV per ticket.
-import type { Candle } from './market-types';
-import { structureSignals } from './chan.ts';
+import type { Candle, Interval } from './market-types';
+import { structureBias, structureSignals } from './chan.ts';
 
 export type SetupId = 'first' | 'second' | 'third' | 'weakening';
 export const SETUPS: SetupId[] = ['first', 'second', 'third', 'weakening'];
@@ -17,15 +17,47 @@ export function setupOf(type: string): SetupId | null {
   return null;
 }
 
-export interface BacktestOptions { targetR: number; maxHoldBars: number; stopBufferAtr: number; maxRiskAtr: number; warmup: number }
+export interface BacktestOptions { targetR: number; maxHoldBars: number; stopBufferAtr: number; maxRiskAtr: number; warmup: number; barSeconds?: number; higherSeconds?: number }
 export const DEFAULT_BACKTEST: BacktestOptions = { targetR: 2, maxHoldBars: 48, stopBufferAtr: 0.1, maxRiskAtr: 4, warmup: 60 };
-export interface BacktestTrade { symbol: string; setup: SetupId; level: SignalLevel; side: 'long' | 'short'; signalTime: number; entryTime: number; entry: number; stop: number; target: number; r: number; exit: 'target' | 'stop' | 'time' | 'open'; bars: number }
+export type Exit = 'target' | 'stop' | 'breakeven' | 'time' | 'open';
+export interface BacktestTrade { symbol: string; setup: SetupId; level: SignalLevel; side: 'long' | 'short'; signalTime: number; entryTime: number; entry: number; stop: number; target: number; r: number; exit: Exit; bars: number }
+/** A signal entry before the exit rules are applied: the bars after the entry
+ * are kept so that every target / break-even variant replays the same trade. */
+export interface Candidate { symbol: string; setup: SetupId; level: SignalLevel; side: 'long' | 'short'; signalTime: number; entryTime: number; entry: number; stop: number; path: [number, number, number][]; complete: boolean; higher: 'long' | 'short' | 'neutral' | null }
 
-/** Trades for one instrument and one signal level. */
-export function backtestSignals(candles: Candle[], symbol: string, level: SignalLevel, options: Partial<BacktestOptions> = {}): BacktestTrade[] {
+/** Seconds per bar and of the next timeframe used for the confluence filter. */
+export const HIGHER_OF: Partial<Record<Interval, { bar: number; higher: number }>> = {
+  '1m': { bar: 60, higher: 300 }, '5m': { bar: 300, higher: 900 }, '15m': { bar: 900, higher: 3600 }, '30m': { bar: 1800, higher: 14400 },
+  '1h': { bar: 3600, higher: 14400 }, '4h': { bar: 14400, higher: 86400 }, '1d': { bar: 86400, higher: 604800 }
+};
+const MIN_HIGHER_BARS = 30;
+/** Buckets bars into a longer timeframe; only buckets that ended by `until`. */
+export function aggregateCandles(bars: Candle[], seconds: number, until: number): Candle[] {
+  const out: Candle[] = [];
+  for (const b of bars) {
+    const start = Math.floor(b.time / seconds) * seconds;
+    if (start + seconds > until) break;
+    const last = out[out.length - 1];
+    if (last && last.time === start) { last.high = Math.max(last.high, b.high); last.low = Math.min(last.low, b.low); last.close = b.close; last.volume += b.volume; }
+    else out.push({ time: start, open: b.open, high: b.high, low: b.low, close: b.close, volume: b.volume, closed: true });
+  }
+  return out;
+}
+
+/** Signal entries for one instrument and one signal level, without look-ahead:
+ * the structure is recomputed on every prefix and the entry is the close of the
+ * bar where the signal first appears. */
+export function backtestCandidates(candles: Candle[], symbol: string, level: SignalLevel, options: Partial<BacktestOptions> = {}): Candidate[] {
   const o = { ...DEFAULT_BACKTEST, ...options };
   const bars = candles.filter(c => c.closed !== false);
-  const seen = new Set<string>(), trades: BacktestTrade[] = [];
+  const seen = new Set<string>(), out: Candidate[] = [], bias = new Map<number, 'long' | 'short' | 'neutral'>();
+  const higherAt = (k: number) => {
+    if (!o.barSeconds || !o.higherSeconds) return null;
+    const higher = aggregateCandles(bars.slice(0, k + 1), o.higherSeconds, bars[k].time + o.barSeconds);
+    if (higher.length < MIN_HIGHER_BARS) return null;
+    if (!bias.has(higher.length)) bias.set(higher.length, structureBias(higher));
+    return bias.get(higher.length)!;
+  };
   for (let k = o.warmup; k < bars.length - 1; k++) {
     const { signals, atr } = structureSignals(bars.slice(0, k + 1), level);
     for (const s of signals) {
@@ -39,21 +71,71 @@ export function backtestSignals(candles: Candle[], symbol: string, level: Signal
       const stop = buy ? extreme - o.stopBufferAtr * atr : extreme + o.stopBufferAtr * atr;
       const risk = buy ? entry - stop : stop - entry;
       if (!(risk > 0) || (atr > 0 && risk > o.maxRiskAtr * atr)) continue;
-      const target = buy ? entry + o.targetR * risk : entry - o.targetR * risk;
-      let r = 0, exit: BacktestTrade['exit'] = 'open', held = 0;
-      for (let j = k + 1; j < bars.length && held < o.maxHoldBars; j++) {
-        const b = bars[j]; held++;
-        const hitStop = buy ? b.low <= stop : b.high >= stop, hitTarget = buy ? b.high >= target : b.low <= target;
-        // Same-bar stop and target: the order is unknown, so count the stop.
-        if (hitStop) { r = -1; exit = 'stop'; break; }
-        if (hitTarget) { r = o.targetR; exit = 'target'; break; }
-        if (held === o.maxHoldBars) { r = (buy ? b.close - entry : entry - b.close) / risk; exit = 'time'; }
-      }
-      if (exit === 'open') continue; // not enough future bars yet
-      trades.push({ symbol, setup, level, side: s.side, signalTime: s.time, entryTime: bars[k].time, entry, stop, target, r, exit, bars: held });
+      const path = bars.slice(k + 1, k + 1 + o.maxHoldBars).map(b => [b.high, b.low, b.close] as [number, number, number]);
+      out.push({ symbol, setup, level, side: s.side, signalTime: s.time, entryTime: bars[k].time, entry, stop, path, complete: path.length === o.maxHoldBars, higher: higherAt(k) });
     }
   }
-  return trades;
+  return out;
+}
+
+/** Exit rules: fixed target in R and, optionally, the stop moves to the entry
+ * after 1R (Target 1). The new stop applies from the next bar. A bar that
+ * touches stop and target counts as the stop. null = not resolved yet. */
+export function resolveCandidate(c: Candidate, targetR: number, breakEven = false): { r: number; exit: Exit; bars: number; target: number } | null {
+  const buy = c.side === 'long', risk = buy ? c.entry - c.stop : c.stop - c.entry;
+  const target = buy ? c.entry + targetR * risk : c.entry - targetR * risk, one = buy ? c.entry + risk : c.entry - risk;
+  let stop = c.stop, moved = false;
+  for (let j = 0; j < c.path.length; j++) {
+    const [high, low, close] = c.path[j];
+    if (buy ? low <= stop : high >= stop) return moved ? { r: 0, exit: 'breakeven', bars: j + 1, target } : { r: -1, exit: 'stop', bars: j + 1, target };
+    if (buy ? high >= target : low <= target) return { r: targetR, exit: 'target', bars: j + 1, target };
+    if (breakEven && !moved && (buy ? high >= one : low <= one)) { moved = true; stop = c.entry; }
+    if (j === c.path.length - 1 && c.complete) return { r: (buy ? close - c.entry : c.entry - close) / risk, exit: 'time', bars: j + 1, target };
+  }
+  return null;
+}
+
+export type HigherFilter = 'off' | 'not-against' | 'aligned';
+export type SessionFilter = 'all' | 'london' | 'ny' | 'london-ny';
+export interface Variant { higher: HigherFilter; session: SessionFilter; targetR: number; breakEven: boolean }
+export const BASELINE: Variant = { higher: 'off', session: 'all', targetR: 2, breakEven: false };
+export const HIGHER_FILTERS: HigherFilter[] = ['off', 'not-against', 'aligned'];
+export const SESSION_FILTERS: SessionFilter[] = ['all', 'london', 'ny', 'london-ny'];
+export const TARGETS = [1.5, 2, 2.5, 3];
+export const variantKey = (v: Variant) => `${v.higher}|${v.session}|${v.targetR}|${v.breakEven ? 'be' : 'no'}`;
+
+const hourFormat = new Map<string, Intl.DateTimeFormat>();
+function hourIn(zone: string, seconds: number) {
+  if (!hourFormat.has(zone)) hourFormat.set(zone, new Intl.DateTimeFormat('en-GB', { timeZone: zone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }));
+  const [h, m] = hourFormat.get(zone)!.format(new Date(seconds * 1000)).split(':').map(Number);
+  return h + m / 60;
+}
+/** London 08:00–17:00 London time, New York 08:00–17:00 New York time, at the entry. */
+export function inSession(seconds: number, session: SessionFilter): boolean {
+  if (session === 'all') return true;
+  const london = () => { const h = hourIn('Europe/London', seconds); return h >= 8 && h < 17; };
+  const ny = () => { const h = hourIn('America/New_York', seconds); return h >= 8 && h < 17; };
+  return session === 'london' ? london() : session === 'ny' ? ny() : london() || ny();
+}
+export function passesFilters(c: Candidate, v: Variant, barSeconds = 0): boolean {
+  if (v.higher === 'aligned' && c.higher !== c.side) return false;
+  if (v.higher === 'not-against' && (c.higher === null || (c.higher !== 'neutral' && c.higher !== c.side))) return false;
+  return inSession(c.entryTime + barSeconds, v.session);
+}
+export function variantTrades(candidates: Candidate[], v: Variant, barSeconds = 0): BacktestTrade[] {
+  const out: BacktestTrade[] = [];
+  for (const c of candidates) {
+    if (!passesFilters(c, v, barSeconds)) continue;
+    const r = resolveCandidate(c, v.targetR, v.breakEven);
+    if (r) out.push({ symbol: c.symbol, setup: c.setup, level: c.level, side: c.side, signalTime: c.signalTime, entryTime: c.entryTime, entry: c.entry, stop: c.stop, target: r.target, r: r.r, exit: r.exit, bars: r.bars });
+  }
+  return out;
+}
+
+/** Trades for one instrument and one signal level (no filters). */
+export function backtestSignals(candles: Candle[], symbol: string, level: SignalLevel, options: Partial<BacktestOptions> = {}): BacktestTrade[] {
+  const o = { ...DEFAULT_BACKTEST, ...options };
+  return variantTrades(backtestCandidates(candles, symbol, level, o), { ...BASELINE, targetR: o.targetR });
 }
 
 export interface SetupStats { setup: SetupId | 'all'; trades: number; winRate: number; avgR: number; profitFactor: number | null; maxLosingStreak: number; tradesPerDay: number }
@@ -128,4 +210,28 @@ export function runGrid(trades: BacktestTrade[], days: number, rules: EvalRules,
 export function spanDays(candles: Candle[]): number {
   if (candles.length < 2) return 0;
   return Math.max(1, (candles[candles.length - 1].time - candles[0].time) / 86400);
+}
+
+export interface VariantRow { variant: Variant; key: string; stats: SetupStats; inSampleR: number | null; inSampleTrades: number; outSampleR: number | null; outSampleTrades: number }
+/** Every combination of filters against the baseline (2R, no filters). To limit
+ * overfitting the best variant is chosen on the first 70% of the history (by
+ * entry time) and its average R is then reported on the last 30%. */
+export function compareVariants(candidates: Candidate[], setup: SetupId | 'all', days: number, barSeconds = 0) {
+  const scoped = setup === 'all' ? candidates : candidates.filter(c => c.setup === setup);
+  const times = scoped.map(c => c.entryTime).sort((a, b) => a - b);
+  const cutoff = times.length ? times[Math.floor(times.length * 0.7)] ?? Infinity : Infinity;
+  const mean = (x: BacktestTrade[]) => x.length ? x.reduce((s, t) => s + t.r, 0) / x.length : null;
+  const rows: VariantRow[] = [];
+  for (const higher of HIGHER_FILTERS) for (const session of SESSION_FILTERS) for (const targetR of TARGETS) for (const breakEven of [false, true]) {
+    const variant = { higher, session, targetR, breakEven }, trades = variantTrades(scoped, variant, barSeconds);
+    const early = trades.filter(t => t.entryTime < cutoff), late = trades.filter(t => t.entryTime >= cutoff);
+    rows.push({ variant, key: variantKey(variant), stats: setupStats(trades, setup, days), inSampleR: mean(early), inSampleTrades: early.length, outSampleR: mean(late), outSampleTrades: late.length });
+  }
+  const baseline = rows.find(r => r.key === variantKey(BASELINE))!;
+  const eligible = rows.filter(r => r.stats.trades >= MIN_TRADES && r.inSampleTrades >= 10 && r.outSampleTrades >= 5);
+  const best = eligible.slice().sort((a, b) => (b.inSampleR ?? -Infinity) - (a.inSampleR ?? -Infinity))[0] ?? null;
+  // Use the chosen variant only when it also holds up on the unseen 30%.
+  const holds = !!best && best.outSampleR !== null && best.outSampleR > 0 && best.outSampleR > (baseline.outSampleR ?? -Infinity);
+  const ranked = rows.filter(r => r.stats.trades > 0).sort((a, b) => b.stats.avgR - a.stats.avgR);
+  return { rows, ranked, baseline, best, holds, recommended: holds ? best! : baseline };
 }

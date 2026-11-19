@@ -373,7 +373,7 @@ function addDivergenceSignals(bars:IndexedCandle[], structure:ReturnType<typeof 
  * separated centers. Second buy/sell: after the first point, the next
  * confirmed same-direction segment ends without breaking the first point's
  * extreme. Both stay candidates: recursive lower levels are not verified. */
-export function addFirstSecondSignals(structure:Pick<ReturnType<typeof core>,"segments"|"signals">) {
+export function addFirstSecondSignals(structure:Pick<ReturnType<typeof core>,"segments"|"signals">&Partial<Pick<ReturnType<typeof core>,"centers"|"macd">>, bars?:IndexedCandle[]) {
   const lines=structure.segments.filter(x=>x.confirmed);
   for(const signal of structure.signals) {
     if(signal.type!=='trend-divergence-candidate')continue;
@@ -381,12 +381,47 @@ export function addFirstSecondSignals(structure:Pick<ReturnType<typeof core>,"se
     signal.label=buy?'一买':'一卖';
     signal.type=buy?'first-buy-candidate':'first-sell-candidate';
     signal.reason=`${buy?'下跌':'上涨'}趋势（两个同向中枢）末段出现${buy?'底':'顶'}背驰：同向线段创新${buy?'低':'高'}但MACD柱面积更小。按缠论记为第一类${buy?'买':'卖'}点候选；尚未核实递归次级别走势。`;
+  }
+  // Trend divergence across the last center: two same-direction centers that do
+  // not overlap; the line leaving the last center makes a new extreme beyond the
+  // line entering it, with a smaller MACD histogram area. The legacy check above
+  // compares lines two apart, which can never contain two centers.
+  if(structure.centers&&structure.macd&&bars) {
+    const macd=structure.macd,centers=structure.centers;
+    const area=(line:StructureLine)=>bars.reduce((sum,b,j)=>sum+(b.index>=line.from.index&&b.index<=line.to.index?Math.abs(macd[j]?.hist??0):0),0);
+    for(let k=1;k<centers.length;k++) {
+      const before=centers[k-1],last=centers[k];
+      const down=last.high<before.low,up=last.low>before.high;
+      if(!down&&!up)continue;
+      // The entering line either ends where the center starts or, when the center
+      // is drawn from the breaking line of the previous one, is its first line.
+      const dir=down?'down':'up';
+      const entering=lines.find(x=>x.to.index===last.startIndex&&x.direction===dir)??lines.find(x=>x.from.index===last.startIndex&&x.direction===dir);
+      // The leaving line is the first same-direction line that starts at or after
+      // the end of the center (the center may end on an opposite-direction line).
+      const leaving=lines.find(x=>x.from.index>=last.endIndex&&x.direction===dir&&x.from.index<=(lines.find(y=>y.from.index>=last.endIndex)?.to.index??Infinity));
+      if(!entering||!leaving||entering===leaving)continue;
+      // New extreme: beyond the whole center and beyond the entering line's end.
+      const inside=lines.filter(x=>x.from.index>=last.startIndex&&x.to.index<=last.endIndex).flatMap(x=>[x.from.price,x.to.price]);
+      const bound=down?Math.min(entering.to.price,...inside):Math.max(entering.to.price,...inside);
+      const extreme=down?leaving.to.price<bound:leaving.to.price>bound;
+      const a=area(entering),c=area(leaving);
+      if(!extreme||a<=0||c>=a*0.85)continue;
+      if(structure.signals.some(x=>x.type.startsWith('first-')&&x.index===leaving.to.index))continue;
+      const buy=down;
+      structure.signals.push({...leaving.to,label:buy?'一买':'一卖',side:buy?'long':'short',type:buy?'first-buy-candidate':'first-sell-candidate',confirmed:false,
+        reason:`${buy?'下跌':'上涨'}趋势（两个不重叠的同向中枢）中，离开最后中枢的线段创新${buy?'低':'高'}，但MACD柱面积小于进入该中枢的线段，形成${buy?'底':'顶'}背驰。按缠论记为第一类${buy?'买':'卖'}点候选；尚未核实递归次级别走势。`});
+    }
+  }
+  for(const signal of [...structure.signals]) {
+    if(!signal.type.startsWith('first-'))continue;
+    const buy=signal.side==='long';
     const at=lines.findIndex(x=>x.to.index===signal.index&&x.to.time===signal.time);
     if(at<0)continue;
     const away=lines[at+1],back=lines[at+2];
     if(!away||!back||back.direction!==lines[at].direction)continue;
     const holds=buy?back.to.price>signal.price:back.to.price<signal.price;
-    if(!holds)continue;
+    if(!holds||structure.signals.some(x=>x.type.startsWith('second-')&&x.index===back.to.index))continue;
     structure.signals.push({...back.to,label:buy?'二买':'二卖',side:signal.side,type:buy?'second-buy-candidate':'second-sell-candidate',confirmed:false,
       reason:`第一类${buy?'买':'卖'}点后，首个${buy?'向上':'向下'}线段之后的回${buy?'调':'抽'}线段已确认，且未${buy?'跌破一买低点':'突破一卖高点'}。按缠论记为第二类${buy?'买':'卖'}点候选；尚未核实递归次级别走势。`});
   }
@@ -480,7 +515,7 @@ export interface AnalysisOptions { penMode?:'new'|'old'; horizon?:number; planSe
 export function analyze(candles:Candle[], options:AnalysisOptions={}):Analysis {
   const mode=options.penMode||'new',{bars,invalid}=validClosed(candles),s=core(bars,mode);
   addDivergenceSignals(bars,s);
-  addFirstSecondSignals(s);
+  addFirstSecondSignals(s,bars);
   // Validation can skip the descriptive histogram without altering any plan.
   const {calibration}=historicalCalibration(options.skipCalibration?[]:candles,options);
   if(options.skipCalibration)calibration.method='已跳过历史频率计算；仅用于逐时评估';
@@ -521,10 +556,18 @@ export function structureSignals(candles:Candle[], level:'segment'|'stroke'='seg
     const {centers,signals}=buildCenters(s.strokes);
     const lower={...s,segments:s.strokes,centers,signals};
     addDivergenceSignals(bars,lower);
-    addFirstSecondSignals(lower);
+    addFirstSecondSignals(lower,bars);
     return {signals:lower.signals,atr:atr(bars)};
   }
   addDivergenceSignals(bars,s);
-  addFirstSecondSignals(s);
+  addFirstSecondSignals(s,bars);
   return {signals:s.signals,atr:atr(bars)};
+}
+
+/** Direction of the higher timeframe, the same rule the confluence panel uses:
+ * the structural part of the bias score (MACD excluded) at ±7 or beyond. */
+export function structureBias(candles:Candle[], mode:'new'|'old'='new'):'long'|'short'|'neutral' {
+  const higher=core(validClosed(candles).bars,mode);
+  const structural=higher.bias.factors.slice(0,3).reduce((sum,f)=>sum+f.value,0);
+  return structural>=7?'long':structural<=-7?'short':'neutral';
 }
