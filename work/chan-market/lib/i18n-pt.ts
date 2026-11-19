@@ -446,7 +446,7 @@ const exact: Record<string, string> = {
   "Month": "Mês",
   'Trend Workbench': 'Estação de Tendências',
   'Brazil (B3)': 'Brasil (B3)',
-  'MARKET INTELLIGENCE': 'INTELIGÊNCIA DE MERCADO', 'OBSERVE. DEFINE. ACT.': 'OBSERVE. DEFINA. AJA.', 'CHAN OBSERVATORY': 'OBSERVATÓRIO CHAN', 'CRYPTO': 'CRIPTO', 'US EQUITIES': 'AÇÕES EUA', 'CHINA A': 'AÇÕES CHINA', 'BRAZIL B3': 'B3 BRASIL', 'INDICES & COMMODITIES': 'ÍNDICES E COMMODITIES', 'Search CMOC / 洛阳钼业, BTC, AAPL or ticker…': 'Busque PETR4, BTC, AAPL, XAUUSD ou outro código…', '4H: every 4 hours from 18:00 New York time': '4H: a cada 4 horas a partir das 18:00 de Nova York', 'Indices & commodities': 'Índices e commodities',
+  'MARKET INTELLIGENCE': 'INTELIGÊNCIA DE MERCADO', 'OBSERVE. DEFINE. ACT.': 'OBSERVE. DEFINA. AJA.', 'CHAN OBSERVATORY': 'OBSERVATÓRIO CHAN', 'CRYPTO': 'CRIPTO', 'US EQUITIES': 'AÇÕES EUA', 'CHINA A': 'AÇÕES CHINA', 'BRAZIL B3': 'B3 BRASIL', 'INDICES & COMMODITIES': 'ÍNDICES E COMMODITIES', 'The chart has not loaded yet.': 'O gráfico ainda não carregou.', 'Chart screenshot saved.': 'Captura do gráfico salva.', 'Screenshot failed. Please try again.': 'A captura falhou. Tente de novo.', 'Save chart screenshot (PNG)': 'Salvar captura do gráfico (PNG)', 'Save chart screenshot': 'Salvar captura do gráfico', 'Search CMOC / 洛阳钼业, BTC, AAPL or ticker…': 'Busque PETR4, BTC, AAPL, XAUUSD ou outro código…', '4H: every 4 hours from 18:00 New York time': '4H: a cada 4 horas a partir das 18:00 de Nova York', 'Indices & commodities': 'Índices e commodities',
   '4H: 10:00–14:00, then 14:00–close': '4H: 10:00–14:00 e 14:00–fechamento',
   'B3 equities': 'Ações B3',
   // Analysis labels shared with the engine.
