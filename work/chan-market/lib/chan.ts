@@ -368,6 +368,29 @@ function addDivergenceSignals(bars:IndexedCandle[], structure:ReturnType<typeof 
       reason:`同向线段创新${now.direction==='up'?'高':'低'}，MACD绝对柱面积低于前同向段；${trending?'有两个同向中枢候选背景':'未满足完整趋势背景，按盘整力度减弱观察'}。仅为背驰候选，需核对递归级别和实际比较段。`});
   }
 }
+// Adicionado em trend-workbench-br: 1ª e 2ª compra/venda (一买/二买/一卖/二卖).
+/** First buy/sell: a trend divergence that ends a down/up trend with two
+ * separated centers. Second buy/sell: after the first point, the next
+ * confirmed same-direction segment ends without breaking the first point's
+ * extreme. Both stay candidates: recursive lower levels are not verified. */
+export function addFirstSecondSignals(structure:Pick<ReturnType<typeof core>,"segments"|"signals">) {
+  const lines=structure.segments.filter(x=>x.confirmed);
+  for(const signal of structure.signals) {
+    if(signal.type!=='trend-divergence-candidate')continue;
+    const buy=signal.side==='long';
+    signal.label=buy?'一买':'一卖';
+    signal.type=buy?'first-buy-candidate':'first-sell-candidate';
+    signal.reason=`${buy?'下跌':'上涨'}趋势（两个同向中枢）末段出现${buy?'底':'顶'}背驰：同向线段创新${buy?'低':'高'}但MACD柱面积更小。按缠论记为第一类${buy?'买':'卖'}点候选；尚未核实递归次级别走势。`;
+    const at=lines.findIndex(x=>x.to.index===signal.index&&x.to.time===signal.time);
+    if(at<0)continue;
+    const away=lines[at+1],back=lines[at+2];
+    if(!away||!back||back.direction!==lines[at].direction)continue;
+    const holds=buy?back.to.price>signal.price:back.to.price<signal.price;
+    if(!holds)continue;
+    structure.signals.push({...back.to,label:buy?'二买':'二卖',side:signal.side,type:buy?'second-buy-candidate':'second-sell-candidate',confirmed:false,
+      reason:`第一类${buy?'买':'卖'}点后，首个${buy?'向上':'向下'}线段之后的回${buy?'调':'抽'}线段已确认，且未${buy?'跌破一买低点':'突破一卖高点'}。按缠论记为第二类${buy?'买':'卖'}点候选；尚未核实递归次级别走势。`});
+  }
+}
 const format=(n:number)=>Number(n.toPrecision(6)).toLocaleString('en-US',{maximumFractionDigits:8});
 /** Two future observation boundaries. They are derived from the visible prefix,
  * not predicted future extrema. A calendar bar is not a recursive Chan level. */
@@ -457,6 +480,7 @@ export interface AnalysisOptions { penMode?:'new'|'old'; horizon?:number; planSe
 export function analyze(candles:Candle[], options:AnalysisOptions={}):Analysis {
   const mode=options.penMode||'new',{bars,invalid}=validClosed(candles),s=core(bars,mode);
   addDivergenceSignals(bars,s);
+  addFirstSecondSignals(s);
   // Validation can skip the descriptive histogram without altering any plan.
   const {calibration}=historicalCalibration(options.skipCalibration?[]:candles,options);
   if(options.skipCalibration)calibration.method='已跳过历史频率计算；仅用于逐时评估';
