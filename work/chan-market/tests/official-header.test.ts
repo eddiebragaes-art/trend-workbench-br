@@ -55,7 +55,7 @@ for (const language of ['pt', 'en'] as const) {
     const anchors = await renderHeader(language);
     const required = [
       ['/', language === 'pt' ? 'Estação de Tendências' : 'Trend Station'],
-      ['https://x.com/bi_9527zx', language === 'pt' ? 'DeFi狙击手' : 'Developer (DeFi狙击手)'],
+      ['https://x.com/bi_9527zx', language === 'pt' ? 'Autor original' : 'Developer (DeFi狙击手)'],
       ['https://t.me/jujishou9527', language === 'pt' ? 'Comunidade' : 'Community'],
     ];
     for (const [href, text] of required) {

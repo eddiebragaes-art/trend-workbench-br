@@ -160,7 +160,7 @@ export default function TerminalChart({candles, analysis, layers, symbol, interv
       <text x="18" y="25" fill="#d8e5e9" fontSize="13" fontFamily="monospace">{selected?stamp(selected.time,true,interval,locale):t('正在获取市场数据','Loading market data')}</text>
       {selected&&<text x="18" y="49" fill={selected.close>=selected.open?'#42d6ab':'#f4777c'} fontSize="13" fontFamily="monospace">{t('开','O')} {priceText(selected.open)}  {t('高','H')} {priceText(selected.high)}  {t('低','L')} {priceText(selected.low)}  {t('收','C')} {priceText(selected.close)}</text>}
       <text x={W/2-50} y="230" textAnchor="middle" fill="url(#watermark-grad)" fontSize="52" fontWeight="700" letterSpacing="3">{symbol}</text>
-      <text x={W/2-50} y="258" textAnchor="middle" fill="#23343d" fontSize="12" letterSpacing="5">CHAN OBSERVATORY</text>
+      <text x={W/2-50} y="258" textAnchor="middle" fill="#23343d" fontSize="12" letterSpacing="5">{t('CHAN OBSERVATORY','CHAN OBSERVATORY')}</text>
       {showScenarios&&conditionIndex>=0&&<g><line x1={x(conditionIndex+.5)} x2={x(conditionIndex+.5)} y1={TOP} y2={PH+TOP} stroke="#607781" strokeDasharray="4 5"/><text x={x(conditionIndex+2)} y={TOP+16} fill="#b8cbd2" fontSize="12">{t('推演路径','Projected path')}</text></g>}
       <g clipPath={`url(#${centerClipId})`} data-testid="chart-centers">
         {centerDrawings.map(({center:c,geometry:g,number,layer,key,code,upper,lower,description})=>{

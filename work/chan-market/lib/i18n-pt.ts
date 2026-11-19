@@ -446,7 +446,7 @@ const exact: Record<string, string> = {
   "Month": "Mês",
   'Trend Workbench': 'Estação de Tendências',
   'Brazil (B3)': 'Brasil (B3)',
-  'CRYPTO': 'CRIPTO', 'US EQUITIES': 'AÇÕES EUA', 'CHINA A': 'AÇÕES CHINA', 'BRAZIL B3': 'B3 BRASIL',
+  'MARKET INTELLIGENCE': 'INTELIGÊNCIA DE MERCADO', 'OBSERVE. DEFINE. ACT.': 'OBSERVE. DEFINA. AJA.', 'CHAN OBSERVATORY': 'OBSERVATÓRIO CHAN', 'CRYPTO': 'CRIPTO', 'US EQUITIES': 'AÇÕES EUA', 'CHINA A': 'AÇÕES CHINA', 'BRAZIL B3': 'B3 BRASIL',
   '4H: 10:00–14:00, then 14:00–close': '4H: 10:00–14:00 e 14:00–fechamento',
   'B3 equities': 'Ações B3',
   // Analysis labels shared with the engine.
@@ -462,7 +462,7 @@ const exact: Record<string, string> = {
 
 const patterns: [RegExp, string][] = [
   [/^Imported (.+) bars$/, 'Importadas $1 velas'],
-  [/^Developer \((.+)\)$/, '$1'],
+  [/^Developer \((.+)\)$/, 'Autor original'],
   [/^Showing candles fetched at (.+)\. New signals are paused\.$/, 'Mostrando velas obtidas em $1. Novos sinais estão pausados.'],
   [/^Next (\d+) bars after similar structures$/, 'Próximas $1 velas depois de estruturas semelhantes'],
   [/^(\d+) candles · (\d+) folds$/, '$1 velas · $2 blocos de validação'],
