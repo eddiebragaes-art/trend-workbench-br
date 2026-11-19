@@ -236,6 +236,7 @@ export const translateInstrumentName = (name: string, language: Language): strin
   if (language === 'zh') return value;
   // Bilingual preset names such as "NVIDIA 英伟达": keep the Latin part when there is one.
   const latin = value.replace(/[\u3400-\u9fff]+/g, '').replace(/\s+/g, ' ').trim();
-  return /[A-Za-z]/.test(latin) ? latin : value;
+  const result = /[A-Za-z]/.test(latin) ? latin : value;
+  return language === 'pt' ? marketTextPt(result) : result;
 };
 export const translateMarketText = (text: string, language: Language): string => pt(language, translateMarketTextEn(text, asEn(language)));
