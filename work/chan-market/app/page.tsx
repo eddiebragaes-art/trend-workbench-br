@@ -1,4 +1,5 @@
 "use client";
+// Modificado para trend-workbench-br: suporte a pt-BR e identidade própria.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Search, ArrowUpRight, ArrowDownRight, ChevronDown, ChevronRight, RefreshCw, Star, X, Activity, Globe2, Layers3, Radio, Download, Upload, StepBack, StepForward, Play, Pause, RotateCcw, AlertTriangle, Check, BarChart3, Crosshair, CheckCircle2, Send } from 'lucide-react';
@@ -6,7 +7,7 @@ import {parseCSV,serializeCSV} from '@/lib/csv';
 import TerminalChart, {priceText, type Layers} from '@/components/terminal-chart';
 import {analyze} from '@/lib/chan';
 import {planSessionKey,readPlanSession} from '@/lib/plan-session';
-import {LanguageProvider,useLanguage} from '@/lib/language';
+import {LANGUAGES,LanguageProvider,useLanguage} from '@/lib/language';
 import {WORKBENCH_BRAND} from '@/lib/workbench-brand';
 import {translateAnalysis} from '@/lib/analysis-i18n';
 import {marketDisplayText,marketLoadErrorText,marketVenueSuffix,translateInstrumentName} from '@/lib/market-i18n';
@@ -206,12 +207,15 @@ function HomeContent(){
           <span className="official-x" aria-hidden="true">𝕏</span>
           <span>{t(`开发者（${WORKBENCH_BRAND.developer}）`,`Developer (${WORKBENCH_BRAND.developer})`)}</span>
         </a>
+        <a href={WORKBENCH_BRAND.originalUrl} target="_blank" rel="noopener noreferrer" title={t('原版项目源码','Original project source')}>
+          <span>{WORKBENCH_BRAND.original[language]}</span>
+        </a>
         <a href={WORKBENCH_BRAND.communityUrl} target="_blank" rel="noopener noreferrer" title={t('在 Telegram 打开社区','Open the community on Telegram')}>
           <Send size={16} aria-hidden="true"/>
           <span>{t('社区交流','Community')}</span>
         </a>
       </nav>
-      <div className="top-right"><button type="button" className="top-refresh" disabled={loading||imported} aria-busy={loading} aria-label={t('刷新行情','Refresh market data')} title={imported?t('本地导入数据无需在线刷新','Imported data does not need an online refresh'):t('刷新当前标的行情和分析','Refresh this instrument and its analysis')} onClick={()=>void fetchData()}><RefreshCw size={17} className={loading?'spin':''} aria-hidden="true"/><span>{loading?t('刷新中','Refreshing'):t('刷新行情','Refresh')}</span></button><span className={`connection ${error?'warning':''}`}><i/>{loading?t('连接中','Connecting'):error?(data?t('行情未更新','Refresh failed'):t('暂无行情','Data unavailable')):imported?t('本地数据','Local data'):replay!==null?t('历史回放 · 刷新暂停','Replay · refresh paused'):t('公开行情 · 30s刷新','Public feed · 30s refresh')}</span><div className="language-switch" role="group" aria-label={t('界面语言','Interface language')}><button aria-pressed={language==='zh'} className={language==='zh'?'active':''} onClick={()=>setLanguage('zh')}>中文</button><button aria-pressed={language==='en'} className={language==='en'?'active':''} onClick={()=>setLanguage('en')}>EN</button></div><span className="avatar">{t('观','C')}</span></div>
+      <div className="top-right"><button type="button" className="top-refresh" disabled={loading||imported} aria-busy={loading} aria-label={t('刷新行情','Refresh market data')} title={imported?t('本地导入数据无需在线刷新','Imported data does not need an online refresh'):t('刷新当前标的行情和分析','Refresh this instrument and its analysis')} onClick={()=>void fetchData()}><RefreshCw size={17} className={loading?'spin':''} aria-hidden="true"/><span>{loading?t('刷新中','Refreshing'):t('刷新行情','Refresh')}</span></button><span className={`connection ${error?'warning':''}`}><i/>{loading?t('连接中','Connecting'):error?(data?t('行情未更新','Refresh failed'):t('暂无行情','Data unavailable')):imported?t('本地数据','Local data'):replay!==null?t('历史回放 · 刷新暂停','Replay · refresh paused'):t('公开行情 · 30s刷新','Public feed · 30s refresh')}</span><div className="language-switch" role="group" aria-label={t('界面语言','Interface language')}>{LANGUAGES.map(code=><button key={code} aria-pressed={language===code} className={language===code?'active':''} onClick={()=>setLanguage(code)}>{code==='zh'?'中文':code.toUpperCase()}</button>)}</div><span className="avatar">{t('观','C')}</span></div>
     </header>
     <aside className="sidebar">
       <div className="sidebar-heading"><span>{t("市场导航","Markets")}</span><Globe2 size={14}/></div>

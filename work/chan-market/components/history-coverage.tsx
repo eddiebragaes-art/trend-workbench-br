@@ -1,9 +1,11 @@
+// Modificado para trend-workbench-br: suporte a pt-BR e identidade própria.
 import type { MarketData } from '@/lib/market-types';
+import { localeFor, pickText } from '../lib/i18n-pt.ts';
 import { useLanguage, type Language } from '@/lib/language';
 
 export default function HistoryCoverage({data,language:override}:{data:MarketData|null;language?:Language}) {
-  const context=useLanguage(),language=override??context.language,locale=language==='zh'?'zh-CN':'en-US';
-  const t=(zh:string,en:string)=>language==='zh'?zh:en;
+  const context=useLanguage(),language=override??context.language,locale=localeFor(language);
+  const t=(zh:string,en:string)=>pickText(language,zh,en);
   if(!data)return null;
   const history=data.history;
   const received=history?.received??data.candles.length;

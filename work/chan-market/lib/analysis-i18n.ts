@@ -1,6 +1,8 @@
+// Modificado para trend-workbench-br: suporte a pt-BR.
+import { analysisToPt } from './analysis-i18n-pt.ts';
 import type { Analysis, Factor, Scenario, Signal, TradeDecision, TradePlan, TradeSetup } from './market-types';
 
-export type AnalysisLanguage = 'zh' | 'en';
+export type AnalysisLanguage = 'zh' | 'en' | 'pt';
 const fmt = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: Math.min(12, Math.max(2, 5 - Math.floor(Math.log10(Math.abs(n) || 1)))) });
 const statusLabels = { untriggered: 'Not triggered', triggered: 'Triggered', invalidated: 'Invalidated', target_reached: 'Target reached' } as const;
 
@@ -159,6 +161,7 @@ function decisionEn(d: TradeDecision, plans: TradePlan[]): TradeDecision {
 /** Localize display text without changing any prices, timestamps, IDs or model states. */
 export function translateAnalysis(analysis: Analysis, language: AnalysisLanguage): Analysis {
   if (language === 'zh') return analysis;
+  if (language === 'pt') return analysisToPt(translateAnalysis(analysis, 'en'));
   const extended = analysis as Analysis & { tradePlans?: TradePlan[]; decision?: TradeDecision };
   const tradePlans = extended.tradePlans?.map(planEn);
   const biasLabels: Record<string, string> = { '样本不足': 'Insufficient history', '结构偏多': 'Bullish structure', '结构偏空': 'Bearish structure', '结构均衡': 'Balanced structure' };

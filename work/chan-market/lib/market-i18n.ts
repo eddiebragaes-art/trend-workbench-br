@@ -1,4 +1,6 @@
-type Language = 'zh' | 'en';
+// Modificado para trend-workbench-br: suporte a pt-BR.
+import { marketTextPt } from './i18n-pt.ts';
+type Language = 'zh' | 'en' | 'pt';
 
 /** Keep numerical details, venue names and provider error codes in translated notices. */
 const phrases: [string,string][] = [
@@ -138,14 +140,14 @@ const period = (label: string) => label === '周' ? 'weekly' : 'monthly';
 const hiddenVenue = /^(?:binance|okx|币安|欧易)$/i;
 
 /** Append the separator only when there is a venue to show. */
-export function marketVenueSuffix(venue: string | undefined, language: Language): string {
+function marketVenueSuffixEn(venue: string | undefined, language: Language): string {
   const name = typeof venue === 'string' ? venue.trim() : '';
-  return name && !hiddenVenue.test(name) ? ` · ${translateMarketText(name, language)}` : '';
+  return name && !hiddenVenue.test(name) ? ` · ${translateMarketTextEn(name, language)}` : '';
 }
 
 /** Format UI copy without changing the provider identity used by data and analysis. */
-export function marketDisplayText(text: string, language: Language): string {
-  const value = translateMarketText(text, language);
+function marketDisplayTextEn(text: string, language: Language): string {
+  const value = translateMarketTextEn(text, language);
   return value
     .replace(/(?:\b(?:binance|okx)\b|币安|欧易)\s+(?=公共现货行情|public spot feed)/gi, '')
     .replace(/(?:https?:\/\/)?(?:[\w-]+\.)*(?:binance\.(?:vision|com|us)|okx\.com)\b(?:\/[\w./?&=%-]*)?|\b(?:binance|okx)\b|币安|欧易/gi,
@@ -155,7 +157,7 @@ export function marketDisplayText(text: string, language: Language): string {
 }
 
 /** After all attempts settle, describe the result once, including distinct HTTP codes if available. */
-export function marketLoadErrorText(message: string, language: Language): string {
+function marketLoadErrorTextEn(message: string, language: Language): string {
   const zh = language === 'zh';
   if (message.startsWith('现货行情暂不可用')) {
     const reasons = message.replace(/^现货行情暂不可用[：:]\s*/, '').split('；');
@@ -174,11 +176,11 @@ export function marketLoadErrorText(message: string, language: Language): string
   if (/^(timeout(error)?\b|the operation (was aborted due to timeout|timed out))|signal timed out/i.test(message)) {
     return zh ? '行情请求超时。' : 'The market data request timed out.';
   }
-  return marketDisplayText(message, language);
+  return marketDisplayTextEn(message, language);
 }
 
 /** Company names are identifiers: never invent English names for arbitrary search results. */
-export function translateInstrumentName(name: string, language: Language): string {
+function translateInstrumentNameEn(name: string, language: Language): string {
   if (language === 'zh') return name;
   const names: Record<string,string> = {
     '比特币 Bitcoin': 'Bitcoin', '以太坊 Ethereum': 'Ethereum', '狗狗币 Dogecoin': 'Dogecoin',
@@ -189,7 +191,7 @@ export function translateInstrumentName(name: string, language: Language): strin
   return names[name] || name;
 }
 
-export function translateMarketText(text: string, language: Language): string {
+function translateMarketTextEn(text: string, language: Language): string {
   if (language === 'zh' || !text) return text;
   let value = text
     .replace(/已跳过(\d+)个覆盖不完整的历史区间或缺口区间。/g, 'Skipped $1 historical or gapped intervals with incomplete coverage.')
@@ -221,3 +223,11 @@ export function translateMarketText(text: string, language: Language): string {
   }
   return value;
 }
+
+const asEn = (language: Language): 'zh' | 'en' => language === 'zh' ? 'zh' : 'en';
+const pt = (language: Language, value: string) => language === 'pt' ? marketTextPt(value) : value;
+export const marketVenueSuffix = (venue: string | undefined, language: Language): string => pt(language, marketVenueSuffixEn(venue, asEn(language)));
+export const marketDisplayText = (text: string, language: Language): string => pt(language, marketDisplayTextEn(text, asEn(language)));
+export const marketLoadErrorText = (message: string, language: Language): string => pt(language, marketLoadErrorTextEn(message, asEn(language)));
+export const translateInstrumentName = (name: string, language: Language): string => translateInstrumentNameEn(name, asEn(language));
+export const translateMarketText = (text: string, language: Language): string => pt(language, translateMarketTextEn(text, asEn(language)));

@@ -1,7 +1,14 @@
-趋势判断工作台 / Trend Workbench
-Copyright 2026 DeFi狙击手
+Estação de Tendências (trend-workbench-br)
+Versão modificada mantida por Eddie (github.com/eddiebragaes-art), 2026.
 
-开发者 X 主页  https://x.com/bi_9527zx
-讨论社群       https://t.me/jujishou9527
+Baseado em: 趋势判断工作台 / Trend Workbench
+Copyright 2026 DeFi狙击手
+Projeto original  https://github.com/nhovongoc0-max/trend-workbench
+开发者 X 主页     https://x.com/bi_9527zx
+讨论社群          https://t.me/jujishou9527
+
+Licenciado sob a Apache License 2.0 (veja LICENSE). Os arquivos alterados
+nesta versão trazem a anotação "Modificado para trend-workbench-br" ou
+"Adicionado em trend-workbench-br" no topo.
 
 Third-party software distributed with the desktop packages retains its own licenses.

@@ -1,4 +1,6 @@
 "use client";
+// Modificado para trend-workbench-br: suporte a pt-BR e identidade própria.
+import { localeFor, pickText } from '../lib/i18n-pt.ts';
 
 import type {Candle,Center,Interval} from '@/lib/market-types';
 import type {StrokeCenter} from '@/lib/center-layers';
@@ -6,8 +8,8 @@ import {useLanguage,type Language} from '@/lib/language';
 import {priceText} from './terminal-chart';
 
 export default function CenterHistory({centers,strokeCenters=[],candles,interval,language:override}:{centers:Center[];strokeCenters?:StrokeCenter[];candles:Candle[];interval:Interval;language?:Language}) {
-  const context=useLanguage(),language=override??context.language,locale=language==='zh'?'zh-CN':'en-US';
-  const t=(zh:string,en:string)=>language==='zh'?zh:en;
+  const context=useLanguage(),language=override??context.language,locale=localeFor(language);
+  const t=(zh:string,en:string)=>pickText(language,zh,en);
   const total=centers.length+strokeCenters.length;
   if(!total)return null;
   const date=(index:number)=>{

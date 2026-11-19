@@ -1,4 +1,6 @@
+// Modificado para trend-workbench-br: suporte a pt-BR e identidade própria.
 import { Activity } from 'lucide-react';
+import { localeFor, pickText } from '../lib/i18n-pt.ts';
 import type { Analysis, Interval, Market, TradePlan } from '@/lib/market-types';
 import { useLanguage, type Language } from '@/lib/language';
 import { isDirectionUnclear } from '@/lib/plan-presentation';
@@ -9,7 +11,7 @@ import ForecastTitleText from './forecast-title-text';
 type Confluence = NonNullable<Analysis['confluence']>;
 type Assessment = Confluence['long'];
 type EvidenceCode = Assessment['evidence'][number]['code'];
-const pick = (language:Language, zh:string, en:string) => language==='zh'?zh:en;
+const pick = (language:Language, zh:string, en:string) => pickText(language,zh,en);
 const intervalNames:Record<Interval,[string,string]> = {
   '1m':['1分钟','1 min'],'5m':['5分钟','5 min'],'15m':['15分钟','15 min'],
   '30m':['30分钟','30 min'],'1h':['1小时','1 hour'],'4h':['4小时','4 hours'],
