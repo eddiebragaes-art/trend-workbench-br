@@ -446,7 +446,7 @@ const exact: Record<string, string> = {
   "Month": "Mês",
   'Trend Workbench': 'Estação de Tendências',
   'Brazil (B3)': 'Brasil (B3)',
-  'MARKET INTELLIGENCE': 'INTELIGÊNCIA DE MERCADO', 'OBSERVE. DEFINE. ACT.': 'OBSERVE. DEFINA. AJA.', 'CHAN OBSERVATORY': 'OBSERVATÓRIO CHAN', 'CRYPTO': 'CRIPTO', 'US EQUITIES': 'AÇÕES EUA', 'CHINA A': 'AÇÕES CHINA', 'BRAZIL B3': 'B3 BRASIL', 'INDICES & COMMODITIES': 'ÍNDICES E COMMODITIES', '4H: every 4 hours from 18:00 New York time': '4H: a cada 4 horas a partir das 18:00 de Nova York', 'Indices & commodities': 'Índices e commodities',
+  'MARKET INTELLIGENCE': 'INTELIGÊNCIA DE MERCADO', 'OBSERVE. DEFINE. ACT.': 'OBSERVE. DEFINA. AJA.', 'CHAN OBSERVATORY': 'OBSERVATÓRIO CHAN', 'CRYPTO': 'CRIPTO', 'US EQUITIES': 'AÇÕES EUA', 'CHINA A': 'AÇÕES CHINA', 'BRAZIL B3': 'B3 BRASIL', 'INDICES & COMMODITIES': 'ÍNDICES E COMMODITIES', 'Search CMOC / 洛阳钼业, BTC, AAPL or ticker…': 'Busque PETR4, BTC, AAPL, XAUUSD ou outro código…', '4H: every 4 hours from 18:00 New York time': '4H: a cada 4 horas a partir das 18:00 de Nova York', 'Indices & commodities': 'Índices e commodities',
   '4H: 10:00–14:00, then 14:00–close': '4H: 10:00–14:00 e 14:00–fechamento',
   'B3 equities': 'Ações B3',
   // Analysis labels shared with the engine.
@@ -463,6 +463,13 @@ const exact: Record<string, string> = {
 const patterns: [RegExp, string][] = [
   [/^Imported (.+) bars$/, 'Importadas $1 velas'],
   [/^Developer \((.+)\)$/, 'Autor original'],
+  [/^Entry condition: retest the entry zone, then wait for this timeframe's candle to close within it at or above (.+)\.$/, 'Condição de entrada: voltar à faixa de entrada e esperar a vela deste período fechar dentro dela, em $1 ou acima.'],
+  [/^Entry condition: rebound into the entry zone, then wait for this timeframe's candle to close within it at or below (.+)\.$/, 'Condição de entrada: repicar até a faixa de entrada e esperar a vela deste período fechar dentro dela, em $1 ou abaixo.'],
+  [/^Entry condition: wait for a candle close crossing above (.+) and still within the entry zone\. Do not chase outside it\.$/, 'Condição de entrada: esperar uma vela fechar acima de $1 e ainda dentro da faixa de entrada. Não persiga o preço fora dela.'],
+  [/^Entry condition: wait for a candle close crossing below (.+) and still within the entry zone\. Do not chase outside it\.$/, 'Condição de entrada: esperar uma vela fechar abaixo de $1 e ainda dentro da faixa de entrada. Não persiga o preço fora dela.'],
+  [/^Long: (.+); short: (.+)\. A candle-close confirmation is still required\.$/, 'Compra: $1; venda: $2. Ainda é preciso a confirmação no fechamento da vela.'],
+  [/^(.+): (.+)\. Continue tracking the original stop and targets\.$/, '$1: $2. Continue acompanhando o stop e os alvos originais.'],
+  [/^Entry zones, stops and targets use the selected timeframe \((.+)\)\.$/, 'Faixas de entrada, stops e alvos usam o período selecionado ($1).'],
   [/^Showing candles fetched at (.+)\. New signals are paused\.$/, 'Mostrando velas obtidas em $1. Novos sinais estão pausados.'],
   [/^Next (\d+) bars after similar structures$/, 'Próximas $1 velas depois de estruturas semelhantes'],
   [/^(\d+) candles · (\d+) folds$/, '$1 velas · $2 blocos de validação'],
