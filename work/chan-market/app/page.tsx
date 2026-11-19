@@ -27,6 +27,7 @@ import CenterLayerSelector,{type CenterLayerMode} from '@/components/center-laye
 import {buildStrokeCenters} from '@/lib/center-layers';
 import WatchMonitor from '@/components/watch-monitor';
 import ForecastActivity from '@/components/forecast-activity';
+import PaperAccountPanel from '@/components/paper-account';
 import ForecastValidationPanel from '@/components/forecast-validation-panel';
 import type {Analysis,Instrument,Interval,Market,MarketData} from '@/lib/market-types';
 
@@ -265,6 +266,7 @@ function HomeContent(){
       <footer className="workspace-footer"><span>{data?mt(data.delayNotice):t('加密货币 · 美股 · A股，统一结构视角。','Crypto · US equities · China A-shares, one structural view.')}</span></footer>
       <WatchMonitor watchlist={watchlist} interval={interval} enabled={monitorEnabled&&live} onEnabledChange={setMonitorEnabled} onSnapshot={onWatchSnapshot}/>
       <ForecastActivity journal={journal} data={data} notices={notices} saved={journalSaved}/>
+      <PaperAccountPanel journal={journal}/>
       <ForecastValidationPanel/>
     </main>
     <input type="file" accept=".csv,text/csv" ref={fileInput} hidden onChange={e=>{const f=e.target.files?.[0];e.target.value='';if(f)void importFile(f);}}/>
